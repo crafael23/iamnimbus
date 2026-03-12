@@ -1,0 +1,111 @@
+import { AuthKit, type AuthFunctions } from "@convex-dev/workos-authkit";
+import { components, internal } from "./_generated/api";
+import type { DataModel } from "./_generated/dataModel";
+
+const authFunctions: AuthFunctions = internal.auth;
+
+export const authKit = new AuthKit<DataModel>(components.workOSAuthKit, {
+	authFunctions,
+	additionalEventTypes: [
+		"organization_membership.created",
+		"organization_membership.updated",
+	],
+});
+
+export const { authKitEvent } = authKit.events({
+	"user.created": async (ctx, event) => {
+    const name =
+      [event.data.firstName, event.data.lastName]
+        .filter(Boolean)
+        .join(" ") ||
+      event.data.email?.split("@")[0] ||
+      "User";
+
+		await ctx.db.insert("users", {
+      authId: event.data.id,
+      tokenIdentifier: event.data.id,
+      name,
+      email: event.data.email ?? "",
+      pictureUrl: event.data.profilePictureUrl ?? undefined,
+      createdAt: Date.now(),
+    });
+
+    // Auto-add new signups to the app's default organization (e.g. iamnimbus)
+    // Requires WORKOS_ORG_ID to be set in Convex env
+    await ctx.scheduler.runAfter(0, internal.workosActions.addUserToOrganization, {
+      workosUserId: event.data.id,
+    });
+  },
+  "user.updated": async (ctx, event) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_authId", (q) => q.eq("authId", event.data.id))
+      .unique();
+
+    if (!user) {
+      return;
+    }
+
+    const name =
+      [event.data.firstName, event.data.lastName]
+        .filter(Boolean)
+        .join(" ") ||
+      event.data.email?.split("@")[0] ||
+      user.name;
+
+    await ctx.db.patch(user._id, {
+      email: event.data.email ?? user.email,
+      name,
+      pictureUrl: event.data.profilePictureUrl ?? user.pictureUrl,
+      updatedAt: Date.now(),
+    });
+  },
+	"user.deleted": async (ctx, event) => {
+		const user = await ctx.db
+			.query("users")
+			.withIndex("by_authId", (q) => q.eq("authId", event.data.id))
+			.unique();
+
+		if (user) {
+			await ctx.db.delete(user._id);
+		}
+	},
+	"organization_membership.created": async (ctx, event) => {
+		const data = event.data as { user_id?: string; userId?: string; role?: { slug?: string }; roles?: Array<{ slug?: string }> };
+		const userId = data.userId ?? data.user_id;
+		const roleSlug = data.role?.slug ?? data.roles?.[0]?.slug;
+
+		if (!userId || !roleSlug) return;
+
+		const user = await ctx.db
+			.query("users")
+			.withIndex("by_authId", (q) => q.eq("authId", userId))
+			.unique();
+
+		if (user) {
+			await ctx.db.patch(user._id, {
+				role: roleSlug,
+				updatedAt: Date.now(),
+			});
+		}
+	},
+	"organization_membership.updated": async (ctx, event) => {
+		const data = event.data as { user_id?: string; userId?: string; role?: { slug?: string }; roles?: Array<{ slug?: string }> };
+		const userId = data.userId ?? data.user_id;
+		const roleSlug = data.role?.slug ?? data.roles?.[0]?.slug;
+
+		if (!userId || !roleSlug) return;
+
+		const user = await ctx.db
+			.query("users")
+			.withIndex("by_authId", (q) => q.eq("authId", userId))
+			.unique();
+
+		if (user) {
+			await ctx.db.patch(user._id, {
+				role: roleSlug,
+				updatedAt: Date.now(),
+			});
+		}
+	},
+});

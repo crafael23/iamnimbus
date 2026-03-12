@@ -1,0 +1,44 @@
+---
+description: Build forms with React Hook Form, Zod, and Field components—patterns and validation
+alwaysApply: true
+---
+
+# React Hook Form (RHF) + Zod + Field
+
+When building forms, follow these patterns.
+
+## Stack
+
+- **State**: React Hook Form `useForm` with `zodResolver(formSchema)`.
+- **Schema**: Zod `z.object({ ... })`; use `z.infer<typeof formSchema>` for form type.
+- **Fields**: Use RHF `<Controller />` with shadcn `<Field />`, `<FieldLabel />`, `<FieldDescription />`, `<FieldError />`.
+
+## Per-field pattern
+
+For every field:
+
+1. Wrap in `<Controller name="..." control={form.control} render={({ field, fieldState }) => (...)} />`.
+2. Put `<Field data-invalid={fieldState.invalid}>` as the wrapper.
+3. Control: set `id={field.name}` (or stable id), `aria-invalid={fieldState.invalid}`.
+4. Errors: render `{fieldState.invalid && <FieldError errors={[fieldState.error]} />}`.
+
+**Input / Textarea:** spread `{...field}` onto `<Input />` or `<Textarea />`.
+
+**Select / Switch / RadioGroup / Checkbox:** use `value={field.value}` and `onValueChange={field.onChange}` (or `checked`/`onCheckedChange` for checkbox/switch). For Select, pass `value`/`onValueChange` to `<Select />` and `aria-invalid` on `<SelectTrigger />`.
+
+## Validation
+
+- Define schema with Zod (e.g. `.min()`, `.max()`, `.email()`).
+- Pass `resolver: zodResolver(formSchema)` and `defaultValues` to `useForm`.
+- Optional: `mode: "onChange"` | `"onBlur"` | `"onSubmit"` (default) | `"onTouched"` | `"all"`.
+
+## Array fields
+
+- Use `useFieldArray({ control: form.control, name: "fieldName" })`; use `fields`, `append`, `remove`.
+- In the schema use `z.array(z.object({ ... })).min(1).max(n)`.
+- Map with `key={field.id}`; use `<Controller name={\`fieldName.${index}.key\`} ... />` for each item.
+
+## Other
+
+- Submit with `form.handleSubmit(onSubmit)`; reset with `form.reset()`.
+- Checkbox arrays: update array in `onCheckedChange` (add/remove id from `field.value`) and set `data-slot="checkbox-group"` on `<FieldGroup />`.

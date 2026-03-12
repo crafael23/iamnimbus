@@ -6,12 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "convex:dev": "convex dev"
   },
   "dependencies": {
+    "@convex-dev/workos": "^0.0.1",
+    "@convex-dev/workos-authkit": "^0.1.6",
+    "@t3-oss/env-nextjs": "^0.13.10",
+    "@workos-inc/authkit-nextjs": "^2.16.0",
+    "convex": "^1.32.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
