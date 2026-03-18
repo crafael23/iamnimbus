@@ -32,7 +32,7 @@ export const { authKitEvent } = authKit.events({
 
     // Auto-add new signups to the app's default organization (e.g. iamnimbus)
     // Requires WORKOS_ORG_ID to be set in Convex env
-    await ctx.scheduler.runAfter(0, internal.workosActions.addUserToOrganization, {
+    await ctx.scheduler.runAfter(0, internal.authInternal.addUserToOrganization, {
       workosUserId: event.data.id,
     });
   },

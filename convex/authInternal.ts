@@ -17,7 +17,7 @@ export const addUserToOrganization = internalAction({
 		const orgId = process.env.WORKOS_ORG_ID;
 		if (!orgId) {
 			console.warn(
-				"[workosActions] WORKOS_ORG_ID not set – skipping org assignment. Set it in Convex to auto-add users to your org."
+				"[auth] WORKOS_ORG_ID not set – skipping org assignment. Set it in Convex to auto-add users to your org."
 			);
 			return;
 		}
@@ -34,10 +34,7 @@ export const addUserToOrganization = internalAction({
 			if (msg.includes("already") || msg.includes("exists")) {
 				return; // Already a member, no-op
 			}
-			console.error(
-				"[workosActions] Failed to add user to organization:",
-				err
-			);
+			console.error("[auth] Failed to add user to organization:", err);
 			throw err;
 		}
 	},

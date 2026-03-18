@@ -1,5 +1,6 @@
 "use client";
 
+import { Chat } from "@/components/Chat";
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import Link from "next/link";
@@ -39,11 +40,19 @@ export default function Home() {
 				</div>
 
 				<Authenticated>
-					<UserProfile />
+					<AuthenticatedGreeting />
+					<div className="mt-6">
+						<UserProfile />
+					</div>
+					<div className="mt-6">
+						<h2 className="text-lg font-medium mb-3">Chat</h2>
+						<Chat />
+					</div>
 				</Authenticated>
 
 				<Unauthenticated>
-					<div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center">
+					<GuestGreeting />
+					<div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center">
 						<p className="text-zinc-400">
 							Sign in to see your profile and get started.
 						</p>
@@ -66,8 +75,41 @@ export default function Home() {
 	);
 }
 
+function GuestGreeting() {
+	const greeting = useQuery(api.demo.queries.publicGreeting);
+	if (greeting === undefined) return null;
+	return (
+		<div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-6 py-4">
+			<p className="text-zinc-300">{greeting.message}</p>
+			<span className="inline-block mt-2 text-xs text-zinc-500 uppercase tracking-wider">
+				{greeting.role}
+			</span>
+		</div>
+	);
+}
+
+function AuthenticatedGreeting() {
+	const userGreeting = useQuery(api.demo.queries.userGreeting);
+	const adminGreeting = useQuery(
+		api.demo.queries.adminGreeting,
+		userGreeting?.role === "admin" ? {} : "skip",
+	);
+
+	const greeting = adminGreeting ?? userGreeting;
+	if (greeting === undefined) return null;
+
+	return (
+		<div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-6 py-4">
+			<p className="text-zinc-300">{greeting.message}</p>
+			<span className="inline-block mt-2 text-xs text-zinc-500 uppercase tracking-wider">
+				{greeting.role}
+			</span>
+		</div>
+	);
+}
+
 function UserProfile() {
-	const profile = useQuery(api.users.getMyProfileOrNull);
+	const profile = useQuery(api.users.queries.getMyProfileOrNull);
 
 	if (profile === undefined) {
 		return (

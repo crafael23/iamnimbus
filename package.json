@@ -10,11 +10,14 @@
     "convex:dev": "convex dev"
   },
   "dependencies": {
+    "@convex-dev/agent": "^0.3.2",
     "@convex-dev/workos": "^0.0.1",
     "@convex-dev/workos-authkit": "^0.1.6",
     "@t3-oss/env-nextjs": "^0.13.10",
     "@workos-inc/authkit-nextjs": "^2.16.0",
+    "ai": "^6.0.116",
     "convex": "^1.32.0",
+    "convex-helpers": "^0.1.114",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
