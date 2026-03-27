@@ -7,8 +7,8 @@ import { components } from "../_generated/api";
  * Model format: provider/model-name (e.g. openai/gpt-4o-mini)
  */
 export const supportAgent = new Agent(components.agent, {
-	name: "Support Agent",
-	languageModel: gateway("openai/gpt-4o-mini"),
-	instructions: "You are a helpful assistant.",
-	maxSteps: 3,
+  name: "Support Agent",
+  languageModel: gateway("anthropic/claude-haiku-4.5"),
+  instructions: "You are a helpful assistant.",
+  maxSteps: 3,
 });
