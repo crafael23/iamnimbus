@@ -1,48 +1,35 @@
-"use node";
-
-import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { supportAgent } from "./agent";
+import { internal } from "../_generated/api";
+import { internalAction } from "../_generated/server";
+import { buildSystemPrompt } from "../_lib/persona";
+import { agents } from "./agent";
 
 /**
- * Create a new thread and get an initial response.
+ * Stream the reply for a saved prompt. Deltas are written to the database so
+ * every subscribed client (and a refreshed tab) sees the same stream.
+ * Internal only: tier and counts were decided in chat.mutations.sendMessage.
  */
-export const createThread = action({
-	args: { prompt: v.string() },
-	handler: async (ctx, { prompt }) => {
-		const { threadId, thread } = await supportAgent.createThread(ctx);
-		const result = await thread.generateText({ prompt });
-		return { threadId, text: result.text };
-	},
-});
-
-/**
- * Continue an existing thread with a new prompt.
- */
-export const continueThread = action({
-	args: { prompt: v.string(), threadId: v.string() },
-	handler: async (ctx, { prompt, threadId }) => {
-		const { thread } = await supportAgent.continueThread(ctx, { threadId });
-		const result = await thread.generateText({ prompt });
-		return result.text;
-	},
-});
-
-/**
- * Internal action to generate AI response asynchronously with streaming.
- * Saves deltas to the database so clients can subscribe via listThreadMessages.
- */
-export const generateResponseAsync = internalAction({
+export const generateResponse = internalAction({
 	args: {
 		threadId: v.string(),
 		promptMessageId: v.string(),
+		tier: v.union(v.literal("guest"), v.literal("registered")),
+		used: v.number(),
+		limit: v.number(),
+		noticeAt: v.number(),
+		prompt: v.string(),
 	},
-	handler: async (ctx, { threadId, promptMessageId }) => {
-		const result = await supportAgent.streamText(
+	handler: async (ctx, args) => {
+		const persona = await ctx.runQuery(
+			internal.prompts.queries.activeContent,
+			{},
+		);
+		const system = buildSystemPrompt({ ...args, persona });
+		const result = await agents[args.tier].streamText(
 			ctx,
-			{ threadId },
-			{ promptMessageId },
-			{ saveStreamDeltas: { chunking: "word", throttleMs: 100 } }
+			{ threadId: args.threadId },
+			{ promptMessageId: args.promptMessageId, system },
+			{ saveStreamDeltas: { chunking: "word", throttleMs: 80 } },
 		);
 		await result.consumeStream();
 	},
