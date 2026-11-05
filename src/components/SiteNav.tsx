@@ -30,16 +30,16 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 		<header className="relative z-20 border-b border-line/70 bg-void/80 backdrop-blur-sm">
 			<nav
 				aria-label="Primary"
-				className="mx-auto flex h-14 max-w-[1100px] items-center gap-5 px-4 text-[13px] sm:gap-7 sm:px-6"
+				className="mx-auto flex h-14 max-w-[1100px] items-center gap-4 px-4 text-[12px] sm:gap-7 sm:px-6 sm:text-[13px]"
 			>
 				<Link
 					href="/"
 					className="font-display text-[12px] tracking-[0.08em] text-ice whitespace-nowrap"
 				>
 					<span className="glow-text">nimbus</span>
-					<span className="text-dim">{"//"}grid</span>
+					<span className="hidden text-dim sm:inline">{"//"}grid</span>
 				</Link>
-				<ul className="flex items-center gap-4 sm:gap-6">
+				<ul className="flex items-center gap-3.5 sm:gap-6">
 					{LINKS.map((link) => (
 						<li key={link.href}>
 							<Link
@@ -71,7 +71,7 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 						</li>
 					)}
 				</ul>
-				<div className="ml-auto flex items-center gap-4">
+				<div className="ml-auto flex items-center gap-4 pl-2">
 					{status}
 					{loading ? null : user ? (
 						<button

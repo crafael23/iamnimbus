@@ -120,7 +120,7 @@ function PostForm({ post, onClose }: { post: Doc<"blogPosts"> | null; onClose: (
 	return (
 		<div>
 			<PanelHeader
-				title={post ? "Edit post" : "New post"}
+				title={postId ? "Edit post" : "New post"}
 				description={
 					status === "published"
 						? "Published. Saving updates the live page and re-indexes it."

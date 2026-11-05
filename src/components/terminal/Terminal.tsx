@@ -157,6 +157,9 @@ export function Terminal() {
 	const submit = async (raw: string) => {
 		const text = raw.trim();
 		if (!text) return;
+		const isLocal = text.startsWith("/help") || text.startsWith("/clear");
+		// Keep the text in the box until the thread is ready to receive it.
+		if (!threadId && !isLocal) return;
 		setInput("");
 		setSelected(0);
 		stick.current = true;
@@ -180,10 +183,7 @@ export function Terminal() {
 			print("error", `Unknown command ${command}. Type /help for the list.`);
 			return;
 		}
-		if (!threadId) {
-			print("error", "Still connecting. Try again in a moment.");
-			return;
-		}
+		if (!threadId) return;
 		try {
 			await sendMessage({ threadId, prompt: text, guestSessionId: guestId });
 		} catch (error) {
@@ -383,7 +383,11 @@ export function Terminal() {
 								}}
 								onKeyDown={onKeyDown}
 								placeholder={
-									replying ? "receiving…" : "ask anything, or type / for commands"
+									!threadId
+										? "connecting…"
+										: replying
+											? "receiving…"
+											: "ask a question, or type /"
 								}
 								aria-describedby={showSuggestions ? "command-list" : undefined}
 								autoComplete="off"
@@ -392,7 +396,7 @@ export function Terminal() {
 							/>
 							<button
 								type="submit"
-								disabled={replying || !input.trim()}
+								disabled={replying || !threadId || !input.trim()}
 								className="shrink-0 pt-[1px] text-[12px] uppercase tracking-[0.12em] text-cyan transition-opacity disabled:opacity-30"
 							>
 								send
