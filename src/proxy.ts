@@ -3,7 +3,16 @@ import { authkitMiddleware } from "@workos-inc/authkit-nextjs";
 export default authkitMiddleware({
 	middlewareAuth: {
 		enabled: true,
-		unauthenticatedPaths: ["/", "/sign-in", "/sign-up"],
+		// Everything public except /admin. Admin data is also guarded in Convex.
+		unauthenticatedPaths: [
+			"/",
+			"/sign-in",
+			"/sign-up",
+			"/blog",
+			"/blog/:path*",
+			"/projects",
+			"/projects/:path*",
+		],
 	},
 });
 
