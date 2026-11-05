@@ -1,7 +1,7 @@
 import { Agent, createTool, stepCountIs } from "@convex-dev/agent";
 import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { z } from "zod";
-import { components } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import { PLACEHOLDER_PERSONA, type Tier } from "../_lib/persona";
 import { NAMESPACES, searchKnowledgeBase } from "../_lib/rag";
 
@@ -33,8 +33,16 @@ const searchKnowledge = createTool({
 				"Restrict to one namespace when the question clearly belongs to it. Omit to search everything.",
 			),
 	}),
-	execute: async (ctx, { query, namespace }) => {
-		const hits = await searchKnowledgeBase(ctx, { query, namespace });
+	execute: async (ctx, { query, namespace }): Promise<string> => {
+		const found = await searchKnowledgeBase(ctx, { query, namespace });
+		// Vector removal is scheduled, so a just-unpublished or deleted doc can
+		// still match for a moment. Only return hits whose doc still exists.
+		const liveKeys: string[] = await ctx.runQuery(
+			internal.knowledge.queries.existingDocIds,
+			{ keys: found.flatMap((h) => (h.key ? [h.key] : [])) },
+		);
+		const live = new Set(liveKeys);
+		const hits = found.filter((h) => h.key && live.has(h.key));
 		if (hits.length === 0) return "No matching records in the knowledge base.";
 		return hits
 			.map((h) => `### ${h.title} [${h.namespace}]\n${h.text}`)

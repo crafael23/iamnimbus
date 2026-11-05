@@ -25,6 +25,8 @@ export const rag = new RAG(components.rag, {
 type SearchCtx = Parameters<typeof rag.search>[0];
 
 export type KnowledgeHit = {
+	/** The knowledgeDocs id the RAG entry was stored under. */
+	key: string | undefined;
 	namespace: Namespace;
 	title: string;
 	score: number;
@@ -58,10 +60,11 @@ export async function searchKnowledgeBase(
 				chunkContext: { before: 1, after: 1 },
 				vectorScoreThreshold: 0.25,
 			});
-			const titles = new Map(entries.map((e) => [e.entryId, e.title]));
+			const byId = new Map(entries.map((e) => [e.entryId, e]));
 			return results.map((r) => ({
+				key: byId.get(r.entryId)?.key,
 				namespace,
-				title: titles.get(r.entryId) ?? "Untitled",
+				title: byId.get(r.entryId)?.title ?? "Untitled",
 				score: r.score,
 				text: r.content.map((c) => c.text).join("\n"),
 			}));

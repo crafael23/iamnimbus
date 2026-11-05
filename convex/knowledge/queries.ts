@@ -46,3 +46,16 @@ export const statusForSource = adminQuery({
 			: null;
 	},
 });
+
+/** Which of these RAG entry keys still name a knowledge doc. */
+export const existingDocIds = internalQuery({
+	args: { keys: v.array(v.string()) },
+	handler: async (ctx, { keys }) => {
+		const live: string[] = [];
+		for (const key of keys) {
+			const id = ctx.db.normalizeId("knowledgeDocs", key);
+			if (id && (await ctx.db.get(id))) live.push(key);
+		}
+		return live;
+	},
+});
