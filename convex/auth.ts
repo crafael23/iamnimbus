@@ -4,12 +4,11 @@ import type { DataModel } from "./_generated/dataModel";
 
 const authFunctions: AuthFunctions = internal.auth;
 
+// Events arrive straight from the WorkOS webhook. The webhook must subscribe to
+// user.created/updated/deleted and organization_membership.created/updated;
+// each event type with a handler in events() below is dispatched to it.
 export const authKit = new AuthKit<DataModel>(components.workOSAuthKit, {
 	authFunctions,
-	additionalEventTypes: [
-		"organization_membership.created",
-		"organization_membership.updated",
-	],
 });
 
 export const { authKitEvent } = authKit.events({

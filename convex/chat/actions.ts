@@ -11,7 +11,7 @@ export const createThread = action({
 	args: { prompt: v.string() },
 	handler: async (ctx, { prompt }) => {
 		const { threadId, thread } = await supportAgent.createThread(ctx);
-		const result = await thread.generateText({ prompt } as never);
+		const result = await thread.generateText({ prompt });
 		return { threadId, text: result.text };
 	},
 });
@@ -23,7 +23,7 @@ export const continueThread = action({
 	args: { prompt: v.string(), threadId: v.string() },
 	handler: async (ctx, { prompt, threadId }) => {
 		const { thread } = await supportAgent.continueThread(ctx, { threadId });
-		const result = await thread.generateText({ prompt } as never);
+		const result = await thread.generateText({ prompt });
 		return result.text;
 	},
 });
@@ -41,7 +41,7 @@ export const generateResponseAsync = internalAction({
 		const result = await supportAgent.streamText(
 			ctx,
 			{ threadId },
-			{ promptMessageId } as never,
+			{ promptMessageId },
 			{ saveStreamDeltas: { chunking: "word", throttleMs: 100 } }
 		);
 		await result.consumeStream();

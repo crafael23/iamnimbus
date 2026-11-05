@@ -21,7 +21,7 @@ convex/
 ├── users/
 │   └── queries.ts
 ├── chat/
-│   ├── agent.ts       # Agent definition (gateway model)
+│   ├── agent.ts       # Agent definition (Convex AI Gateway model)
 │   ├── actions.ts     # createThread, continueThread, generateResponseAsync (streams)
 │   ├── mutations.ts   # createThreadMutation, sendMessage
 │   ├── queries.ts     # listThreadMessages (streaming)
@@ -80,7 +80,7 @@ export const getMyProfile = authedQuery({
 ### 5. Components
 
 - Auth: `@convex-dev/workos-authkit` (already in use).
-- Agent: `@convex-dev/agent` (chat domain, uses `gateway` from `ai`).
+- Agent: `@convex-dev/agent` (chat domain, models via the Convex AI Gateway: `convexGateway` from `@convex-dev/ai-sdk-provider`, no provider key).
 - Future: `@convex-dev/ratelimiter`, `@convex-dev/rag`, `@convex-dev/storage`.
 - Domain logic stays in the main app; components are used as sibling services.
 

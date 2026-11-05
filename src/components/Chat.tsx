@@ -46,7 +46,7 @@ export function Chat() {
 					Start a conversation with the AI assistant.
 				</p>
 				<button
-					onClick={handleStartChat}
+					onClick={() => void handleStartChat()}
 					className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-900 font-medium transition-colors"
 				>
 					Start chat
@@ -65,7 +65,7 @@ export function Chat() {
 					<p className="text-zinc-500 text-sm">Loading…</p>
 				)}
 			</div>
-			<form onSubmit={handleSend} className="p-4 border-t border-zinc-800">
+			<form onSubmit={(e) => void handleSend(e)} className="p-4 border-t border-zinc-800">
 				<div className="flex gap-2">
 					<input
 						type="text"

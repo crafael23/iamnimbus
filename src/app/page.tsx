@@ -17,7 +17,7 @@ export default function Home() {
 					<div className="flex gap-2">
 						{user ? (
 							<button
-								onClick={() => signOut()}
+								onClick={() => void signOut()}
 								className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-medium transition-colors"
 							>
 								Sign out
@@ -139,7 +139,7 @@ function UserProfile() {
 		<div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
 			<div className="flex gap-4 items-start">
 				{profile.pictureUrl ? (
-					// eslint-disable-next-line @next/next/no-img-element
+					// oxlint-disable-next-line nextjs/no-img-element
 					<img
 						src={profile.pictureUrl}
 						alt={profile.name}

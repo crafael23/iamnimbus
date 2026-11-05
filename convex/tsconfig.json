@@ -11,6 +11,8 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    /* TypeScript 6+ no longer auto-includes @types/*; Node actions need these. */
+    "types": ["node"],
 
     /* These compiler options are required by Convex */
     "target": "ESNext",
