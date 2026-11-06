@@ -200,7 +200,7 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 							<option value="">None</option>
 							{repos?.map((r) => (
 								<option key={r.fullName} value={r.fullName} disabled={Boolean(takenBy(r))}>
-									{r.fullName}
+									{r.label}
 									{takenBy(r) ? ` (linked to ${takenBy(r)})` : ""}
 								</option>
 							))}

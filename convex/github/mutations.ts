@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-import { findRepo, refreshRepoDoc, vSyncedRepo } from "../_lib/github";
+import { findRepo, refreshRepoDoc, repoKey, vSyncedRepo } from "../_lib/github";
 import { removeDerivedDoc } from "../_lib/knowledge";
 
 /**
@@ -12,13 +12,16 @@ export const applySync = internalMutation({
 	args: { username: v.string(), repos: v.array(vSyncedRepo) },
 	handler: async (ctx, { username, repos }) => {
 		const now = Date.now();
-		const keep = new Set(repos.map((r) => r.fullName));
-		for (const repo of repos) {
+		// Rows and docs from before keys were normalized drop out below and are
+		// recreated under their lowercase key.
+		const keep = new Set(repos.map((r) => repoKey(r.fullName)));
+		for (const synced of repos) {
+			const repo = { ...synced, fullName: repoKey(synced.fullName), syncedAt: now };
 			const existing = await findRepo(ctx, repo.fullName);
 			if (existing) {
-				await ctx.db.replace(existing._id, { ...repo, syncedAt: now });
+				await ctx.db.replace(existing._id, repo);
 			} else {
-				await ctx.db.insert("githubRepos", { ...repo, syncedAt: now });
+				await ctx.db.insert("githubRepos", repo);
 			}
 			await refreshRepoDoc(ctx, repo.fullName);
 		}

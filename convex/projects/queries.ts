@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { adminQuery } from "../_lib/customFunctions";
-import { findRepo } from "../_lib/github";
+import { findRepo, repoLabel } from "../_lib/github";
 
 export const list = query({
 	args: {},
@@ -34,7 +34,7 @@ export const getBySlug = query({
 		return {
 			...project,
 			repo: repo && {
-				fullName: repo.fullName,
+				fullName: repoLabel(repo),
 				url: repo.url,
 				description: repo.description ?? null,
 				languages: repo.languages,

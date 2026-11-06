@@ -1,4 +1,5 @@
 import { adminQuery } from "../_lib/customFunctions";
+import { repoKey, repoLabel } from "../_lib/github";
 
 export const lastRun = adminQuery({
 	args: {},
@@ -21,7 +22,7 @@ export const repos = adminQuery({
 			ctx.db.query("projects").take(500),
 		]);
 		const linked = new Map(
-			projects.flatMap((p) => (p.githubRepo ? [[p.githubRepo, p] as const] : [])),
+			projects.flatMap((p) => (p.githubRepo ? [[repoKey(p.githubRepo), p] as const] : [])),
 		);
 		return rows
 			.sort((a, b) => b.pushedAt - a.pushedAt)
@@ -29,6 +30,7 @@ export const repos = adminQuery({
 				const project = linked.get(r.fullName);
 				return {
 					fullName: r.fullName,
+					label: repoLabel(r),
 					description: r.description ?? null,
 					pushedAt: r.pushedAt,
 					linkedProject: project ? { _id: project._id, title: project.title } : null,

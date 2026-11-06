@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { adminMutation } from "../_lib/customFunctions";
-import { findRepo, projectForRepo, refreshRepoDoc, repoUrlFor } from "../_lib/github";
+import { findRepo, projectForRepo, refreshRepoDoc, repoKey, repoUrlFor } from "../_lib/github";
 import { removeDerivedDoc, upsertDerivedDoc } from "../_lib/knowledge";
 import { assertSlug } from "../_lib/slug";
 
@@ -89,7 +89,7 @@ export const save = adminMutation({
 		const clean = {
 			...fields,
 			stack,
-			githubRepo: fields.githubRepo || undefined,
+			githubRepo: fields.githubRepo?.trim() ? repoKey(fields.githubRepo) : undefined,
 			repoUrl: fields.githubRepo ? undefined : fields.repoUrl,
 		};
 		await validate(ctx, clean, projectId);
@@ -111,7 +111,7 @@ export const save = adminMutation({
 			content: knowledgeContent(clean),
 		});
 		// Both repos' docs name (or stop naming) this project.
-		if (previousRepo && previousRepo !== clean.githubRepo) {
+		if (previousRepo && repoKey(previousRepo) !== clean.githubRepo) {
 			await refreshRepoDoc(ctx, previousRepo);
 		}
 		if (clean.githubRepo) await refreshRepoDoc(ctx, clean.githubRepo);

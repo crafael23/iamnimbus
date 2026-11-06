@@ -138,6 +138,30 @@ describe("projects linked to GitHub repos", () => {
 		expect((await docFor(t, "github", "owner/alpha"))?.content).toContain("Portfolio project: Project site");
 	});
 
+	test("repo identity ignores case, so a case-only rename cannot free the repo", async () => {
+		const t = setup();
+		const admin = await synced(t, ["Alpha"]);
+		await admin.mutation(api.projects.mutations.save, project("one", "owner/Alpha"));
+		// GitHub now reports the same repo in lower case.
+		await t.mutation(internal.github.mutations.applySync, { username: "owner", repos: [repo("alpha")] });
+
+		for (const spelling of ["owner/alpha", "OWNER/ALPHA"]) {
+			await expect(
+				admin.mutation(api.projects.mutations.save, project(`two-${spelling.length}`, spelling)),
+			).rejects.toThrow(/already linked to “Project one”/);
+		}
+		const page = await t.query(api.projects.queries.getBySlug, { slug: "one" });
+		expect(page?.repo?.fullName).toBe("owner/alpha");
+		const docs = await t.run((ctx) =>
+			ctx.db
+				.query("knowledgeDocs")
+				.withIndex("by_source", (q) => q.eq("source", "github"))
+				.collect(),
+		);
+		expect(docs.map((d) => d.sourceKey)).toEqual(["owner/alpha"]);
+		expect(docs[0]?.content).toContain("Portfolio project: Project one");
+	});
+
 	test("the picker lists synced repos with the project each belongs to", async () => {
 		const t = setup();
 		const admin = await synced(t);
