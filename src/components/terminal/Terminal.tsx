@@ -61,6 +61,8 @@ export function Terminal() {
 	 */
 	const [readToken, setReadToken] = useState<string | null>(null);
 	const lineId = useRef(0);
+	/** Set while a message waits on a guest token, before `replying` can see it. */
+	const sending = useRef(false);
 
 	const startThread = useMutation(api.chat.mutations.startThread);
 	const sendMessage = useMutation(
@@ -189,7 +191,7 @@ export function Terminal() {
 		if (!text) return;
 		const isLocal = text.startsWith("/help") || text.startsWith("/clear");
 		// Keep the text in the box until the thread is ready to receive it.
-		if (!threadId && !isLocal) return;
+		if ((!threadId || sending.current) && !isLocal) return;
 		setInput("");
 		setSelected(0);
 		stick.current = true;
@@ -214,6 +216,7 @@ export function Terminal() {
 			return;
 		}
 		if (!threadId) return;
+		sending.current = true;
 		try {
 			await sendMessage({
 				threadId,
@@ -244,6 +247,8 @@ export function Terminal() {
 				setInput(text);
 				print("error", "The message did not go through. Check your connection and send it again.");
 			}
+		} finally {
+			sending.current = false;
 		}
 	};
 
