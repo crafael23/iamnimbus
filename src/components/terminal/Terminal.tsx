@@ -323,21 +323,19 @@ export function Terminal() {
 				if (e.target === e.currentTarget) setDegauss(false);
 			}}
 		>
-			<div aria-hidden className={`crt-glass ${replying ? "is-live" : ""}`} />
-
 			<SiteNav status={status} />
 
 			<div
 				ref={scroller}
 				onScroll={onScroll}
-				className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain"
+				className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
 			>
 				<div
 					ref={content}
 					role="log"
 					aria-live="polite"
 					aria-relevant="additions"
-					className="crt-text mx-auto max-w-[860px] px-5 pb-10 sm:px-10"
+					className="crt-text mx-auto w-full max-w-[860px] px-5 sm:px-10"
 				>
 					{cleared === 0 && (
 						<BootSequence lines={bootLines} instant={booted} onDone={finishBoot} />
@@ -379,88 +377,88 @@ export function Terminal() {
 						</>
 					)}
 				</div>
-			</div>
-
-			{bootDone && !gated && (
-				<div className="relative z-10 shrink-0 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-2 sm:px-10 sm:pb-8">
-					<div className="mx-auto max-w-[860px]">
-						{showSuggestions && (
-							<ul
-								id="command-list"
-								aria-label="Commands"
-								className="crt-text mb-3 text-[19px] sm:text-[20px]"
-							>
-								{suggestions.map((c, i) => (
-									<li key={c.name}>
-										<button
-											type="button"
-											tabIndex={-1}
-											aria-current={i === selected ? "true" : undefined}
-											onPointerDown={(e) => {
-												e.preventDefault();
-												void submit(c.name);
-											}}
-											className={`flex w-full gap-4 px-2 py-0.5 text-left ${
-												i === selected ? "reverse" : "text-fog"
-											}`}
-										>
-											<span className="w-[10ch] shrink-0">{c.name}</span>
-											<span className={i === selected ? "" : "text-dim"}>{c.hint}</span>
-											{c.local && (
-												<span className={`ml-auto uppercase ${i === selected ? "" : "text-dim/70"}`}>
-													local
-												</span>
-											)}
-										</button>
-									</li>
-								))}
-							</ul>
-						)}
-						<form
-							onSubmit={(e) => {
-								e.preventDefault();
-								if (!replying) void submit(input);
-							}}
-							className="crt-text flex items-start gap-[1ch] pt-3"
-						>
-							<label htmlFor="prompt" className="shrink-0 select-none text-[20px] leading-[1.3] glow-text sm:text-[22px]">
-								{">"}
-								<span className="sr-only">Message</span>
-							</label>
-							<textarea
-								id="prompt"
-								ref={inputRef}
-								value={input}
-								rows={1}
-								maxLength={2000}
-								onChange={(e) => {
-									setInput(e.target.value);
-									setSelected(0);
+				{bootDone && !gated && (
+					<div className="sticky bottom-0 z-10 mt-8 w-full bg-gradient-to-t from-void from-70% to-transparent px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-6 sm:px-10 sm:pb-10">
+						<div className="relative mx-auto max-w-[860px]">
+							{/* Floats above the box so opening it never moves the input. */}
+							{showSuggestions && (
+								<ul
+									id="command-list"
+									aria-label="Commands"
+									className="crt-text absolute inset-x-0 bottom-full mb-2 border border-line bg-void/95 py-1 text-[19px] sm:text-[20px]"
+								>
+									{suggestions.map((c, i) => (
+										<li key={c.name}>
+											<button
+												type="button"
+												tabIndex={-1}
+												aria-current={i === selected ? "true" : undefined}
+												onPointerDown={(e) => {
+													e.preventDefault();
+													void submit(c.name);
+												}}
+												className={`flex w-full gap-4 px-2 py-0.5 text-left ${
+													i === selected ? "reverse" : "text-fog"
+												}`}
+											>
+												<span className="w-[10ch] shrink-0">{c.name}</span>
+												<span className={i === selected ? "" : "text-dim"}>{c.hint}</span>
+												{c.local && (
+													<span className={`ml-auto uppercase ${i === selected ? "" : "text-dim/70"}`}>
+														local
+													</span>
+												)}
+											</button>
+										</li>
+									))}
+								</ul>
+							)}
+							<form
+								onSubmit={(e) => {
+									e.preventDefault();
+									if (!replying) void submit(input);
 								}}
-								onKeyDown={onKeyDown}
-								placeholder={
-									!threadId
-										? "connecting…"
-										: replying
-											? "receiving…"
-											: "ask a question, or type /"
-								}
-								aria-describedby={showSuggestions ? "command-list" : undefined}
-								autoComplete="off"
-								spellCheck={false}
-								className="max-h-40 min-h-[1.3em] w-full resize-none bg-transparent text-[20px] leading-[1.3] text-ice caret-cyan outline-none [caret-shape:block] [field-sizing:content] placeholder:text-dim focus-visible:outline-none sm:text-[22px]"
-							/>
-							<button
-								type="submit"
-								disabled={replying || !threadId || !input.trim()}
-								className="shrink-0 text-[17px] uppercase tracking-[0.14em] text-dim transition-colors hover:text-cyan enabled:text-cyan-dim disabled:opacity-0 sm:text-[19px]"
+								className="crt-text flex items-start gap-[1ch] border border-line-strong px-4 py-3 shadow-[0_0_18px_-6px_color-mix(in_oklab,var(--color-cyan)_40%,transparent)] transition-[border-color,box-shadow] focus-within:border-cyan-dim focus-within:shadow-[0_0_24px_-6px_color-mix(in_oklab,var(--color-cyan)_60%,transparent)]"
 							>
-								send
-							</button>
-						</form>
+								<label htmlFor="prompt" className="shrink-0 select-none text-[20px] leading-[1.3] glow-text sm:text-[22px]">
+									{">"}
+									<span className="sr-only">Message</span>
+								</label>
+								<textarea
+									id="prompt"
+									ref={inputRef}
+									value={input}
+									rows={1}
+									maxLength={2000}
+									onChange={(e) => {
+										setInput(e.target.value);
+										setSelected(0);
+									}}
+									onKeyDown={onKeyDown}
+									placeholder={
+										!threadId
+											? "connecting…"
+											: replying
+												? "receiving…"
+												: "ask a question, or type /"
+									}
+									aria-describedby={showSuggestions ? "command-list" : undefined}
+									autoComplete="off"
+									spellCheck={false}
+									className="max-h-40 min-h-[1.3em] w-full resize-none bg-transparent text-[20px] leading-[1.3] text-ice caret-cyan outline-none [caret-shape:block] [field-sizing:content] placeholder:text-dim focus-visible:outline-none sm:text-[22px]"
+								/>
+								<button
+									type="submit"
+									disabled={replying || !threadId || !input.trim()}
+									className="shrink-0 text-[17px] uppercase tracking-[0.14em] text-dim transition-colors hover:text-cyan enabled:text-cyan-dim disabled:opacity-0 sm:text-[19px]"
+								>
+									send
+								</button>
+							</form>
+						</div>
 					</div>
-				</div>
-			)}
+				)}
+			</div>
 		</div>
 	);
 }
@@ -492,10 +490,10 @@ function SessionGate({ reason }: { reason: "session" | "network" }) {
 	return (
 		<section
 			aria-label="Guest session ended"
-			className="line-in mt-12 border-l-2 border-amber pl-5 text-[19px] leading-snug sm:text-[21px]"
+			className="line-in mb-16 mt-12 border-l-2 border-amber pl-5 text-[19px] leading-snug sm:text-[21px]"
 		>
 			<p className="glow-amber uppercase tracking-[0.14em]">
-				link terminated <span aria-hidden className="cursor-blink">{"\u25A0"}</span>
+				link terminated <span aria-hidden>{"\u25A0"}</span>
 			</p>
 			<p className="mt-3 max-w-[52ch] text-fog">
 				{reason === "network"

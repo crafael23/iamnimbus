@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 /** Barrel strength: a corner moves inward by CURVE / 4 of the screen's size. */
-const CURVE = 0.075;
+const CURVE = 0.1;
 
 type Curve = { url: string; scale: number; width: number; height: number };
 
@@ -46,8 +46,12 @@ function barrelMap(width: number, height: number): Curve | null {
 /**
  * The tube every page lives in: a fixed screen that scrolls inside itself,
  * bent by true barrel curvature on desktop browsers that render SVG filters
- * well, behind a layer of glass (scanlines, a drifting refresh band, edge
- * falloff and a reflection). Safari and
+ * well, behind one static layer of glass (scanlines, edge falloff and a
+ * reflection).
+ *
+ * The filter re-renders the whole screen whenever anything inside it paints,
+ * so nothing in the screen may animate indefinitely: motion here is one-shot
+ * (boot, new output, degauss) or tied to activity (streaming, the caret). Safari and
  * touch devices keep the glass without the distortion. The admin stays flat
  * so editing stays precise.
  */
@@ -104,12 +108,7 @@ export function CrtScreen({ children }: { children: ReactNode }) {
 				</div>
 			</div>
 			{/* The glass sits in front of the bent image, so it stays crisp. */}
-			<div aria-hidden className="crt-screen crt-overlay">
-				{!quiet && <div className="crt-roll" />}
-				<div className="crt-scan" style={quiet ? { opacity: 0.4 } : undefined} />
-				<div className="crt-glare" />
-				<div className="crt-vignette" style={quiet ? { opacity: 0.5 } : undefined} />
-			</div>
+			<div aria-hidden className="crt-screen crt-overlay" data-quiet={quiet || undefined} />
 			{curve && (
 				<svg aria-hidden width="0" height="0" className="pointer-events-none absolute">
 					<filter

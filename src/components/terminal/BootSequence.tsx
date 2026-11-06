@@ -96,7 +96,7 @@ export function BootSequence({
 			</dl>
 			{shown >= lines.length + 2 && (
 				<p
-					className={`${animate ? "line-in" : ""} whisper mt-8 text-[19px] text-cyan-dim sm:text-[21px]`}
+					className={`${animate ? "line-in" : ""} mt-8 text-[19px] text-cyan-dim sm:text-[21px]`}
 				>
 					someone left this terminal running.
 				</p>
