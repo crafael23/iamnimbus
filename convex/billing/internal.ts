@@ -1,6 +1,11 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-import { recordSpend, releaseReservation, reserveTurn } from "../_lib/billing";
+import {
+	RESERVATION_TTL_MS,
+	recordSpend,
+	releaseReservation,
+	reserveTurn,
+} from "../_lib/billing";
 
 /** Add one call's cost to this month's and today's spend. */
 export const record = internalMutation({
@@ -23,9 +28,11 @@ export const release = internalMutation({
 });
 
 /**
- * Called when a reply starts: keep its hold, or, if the hold expired while the
- * job was queued, reserve again within budget. Returns null when the budget
- * no longer fits, and the reply must not run.
+ * Called when a reply starts. A live hold is renewed so it stays counted for
+ * the whole reply (actions finish well inside the TTL). An expired hold, which
+ * the budget no longer counts, is dropped and the turn must reserve again
+ * within budget. Returns null when the budget no longer fits: the reply must
+ * not run.
  */
 export const claim = internalMutation({
 	args: {
@@ -34,9 +41,15 @@ export const claim = internalMutation({
 	},
 	returns: v.union(v.id("aiReservations"), v.null()),
 	handler: async (ctx, { reservationId, tier }) => {
-		if (await ctx.db.get(reservationId)) return reservationId;
+		const now = Date.now();
+		const hold = await ctx.db.get(reservationId);
+		if (hold && hold.createdAt > now - RESERVATION_TTL_MS) {
+			await ctx.db.patch(reservationId, { createdAt: now });
+			return reservationId;
+		}
+		if (hold) await ctx.db.delete(reservationId);
 		try {
-			return await reserveTurn(ctx, tier);
+			return await reserveTurn(ctx, tier, now);
 		} catch (error) {
 			if (error instanceof ConvexError && (error.data as { code?: string }).code === "BUDGET") return null;
 			throw error;

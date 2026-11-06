@@ -211,6 +211,41 @@ describe("the AI budget", () => {
 		]);
 	});
 
+	test("an expired hold that was never cleaned up still has to fit the budget again", async () => {
+		const t = setup();
+		await t.run(async (ctx) => {
+			await ctx.db.insert("aiSpend", { period: periods(Date.now()).day, costUsd: 2.97, calls: 1 });
+		});
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "queued", guestToken: await tok(GUEST_A) });
+		const queued = (await scheduled(t)).find((j) => j.name.includes("generateResponse"));
+		if (!queued) throw new Error("no job");
+		await t.run((ctx) => ctx.scheduler.cancel(queued._id));
+		vi.advanceTimersByTime(15 * 60 * 1000 + 1);
+		// Its row survives (no cleanup ran), while another turn holds the rest.
+		await t.run(async (ctx) => {
+			await ctx.db.insert("aiReservations", { amountUsd: 0.02, createdAt: Date.now() });
+		});
+		await t.action(internal.chat.actions.generateResponse, queued.args[0] as never);
+		const { page } = await t.query(api.chat.queries.listThreadMessages, {
+			threadId,
+			guestToken: await tok(GUEST_A),
+			paginationOpts: { numItems: 10, cursor: null },
+		});
+		expect(page.map((m) => m.text)).toEqual(["[not sent: over budget]", expect.stringMatching(/power budget/)]);
+	});
+
+	test("claiming a live hold renews it, so it stays counted while the reply runs", async () => {
+		const t = setup();
+		const reservationId = await t.run((ctx) =>
+			ctx.db.insert("aiReservations", { amountUsd: 0.02, createdAt: Date.now() }),
+		);
+		vi.advanceTimersByTime(14 * 60 * 1000);
+		expect(await t.mutation(internal.billing.internal.claim, { reservationId, tier: "guest" })).toBe(reservationId);
+		const hold = await t.run((ctx) => ctx.db.get(reservationId));
+		expect(hold?.createdAt).toBe(Date.now());
+	});
+
 	test("held amounts from turns in flight count against the limit", async () => {
 		const t = setup();
 		await t.run(async (ctx) => {
