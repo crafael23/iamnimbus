@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import { adminQuery } from "../_lib/customFunctions";
+import type { AsOf } from "../_lib/asOf";
 import { isScreened } from "../_lib/knowledge";
 import { vNamespace } from "../_lib/rag";
 
@@ -48,19 +49,19 @@ export const statusForSource = adminQuery({
 	},
 });
 
-/** Which of these RAG entry keys still name a knowledge doc. */
 /**
- * The keys the agent may use: docs that still exist and, for outside
- * sources, whose content passed the current prompt-injection gate.
+ * The keys the agent may use, with each doc's as-of date: docs that still
+ * exist and, for outside sources, whose content passed the current
+ * prompt-injection gate.
  */
 export const existingDocIds = internalQuery({
 	args: { keys: v.array(v.string()) },
 	handler: async (ctx, { keys }) => {
-		const live: string[] = [];
+		const live: { key: string; asOf?: AsOf }[] = [];
 		for (const key of keys) {
 			const id = ctx.db.normalizeId("knowledgeDocs", key);
 			const doc = id ? await ctx.db.get(id) : null;
-			if (doc && isScreened(doc)) live.push(key);
+			if (doc && isScreened(doc)) live.push({ key, asOf: doc.asOf });
 		}
 		return live;
 	},

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { components, internal } from "../_generated/api";
 import { costOf } from "../_lib/billing";
 import { PLACEHOLDER_PERSONA, type Tier } from "../_lib/persona";
+import { type AsOf, asOfLabel, rankByRecency } from "../_lib/asOf";
 import { NAMESPACES, searchKnowledgeBase } from "../_lib/rag";
 
 /**
@@ -20,9 +21,12 @@ const MAX_OUTPUT_TOKENS: Record<Tier, number> = {
 	registered: 2048,
 };
 
+/** Search results handed to the model per call. */
+const MAX_HITS = 6;
+
 const searchKnowledge = createTool({
 	description:
-		"Search the portfolio owner's knowledge base for facts about their projects, history, skills, goals, published writing and GitHub repositories. Use it only when the visitor asks something specific that these records can answer.",
+		"Search the portfolio owner's knowledge base for facts about their projects, history, skills, goals, published writing and GitHub repositories. Use it only when the visitor asks something specific that these records can answer. Each result is marked \"current\" or \"as of <month year>\" when its date is known: describe older work in the past tense and only call something current when it is marked so.",
 	inputSchema: z.object({
 		query: z
 			.string()
@@ -38,15 +42,23 @@ const searchKnowledge = createTool({
 		const found = await searchKnowledgeBase(ctx, { query, namespace });
 		// Vector removal is scheduled, so a just-unpublished or deleted doc can
 		// still match for a moment. Only return hits whose doc still exists.
-		const liveKeys: string[] = await ctx.runQuery(
+		const live: { key: string; asOf?: AsOf }[] = await ctx.runQuery(
 			internal.knowledge.queries.existingDocIds,
-			{ keys: found.flatMap((h) => (h.key ? [h.key] : [])) },
+			{ keys: [...new Set(found.flatMap((h) => (h.key ? [h.key] : [])))] },
 		);
-		const live = new Set(liveKeys);
-		const hits = found.filter((h) => h.key && live.has(h.key));
+		const asOfByKey = new Map(live.map((d) => [d.key, d.asOf]));
+		const hits = rankByRecency(
+			found.flatMap((h) =>
+				h.key && asOfByKey.has(h.key) ? [{ ...h, asOf: asOfByKey.get(h.key) }] : [],
+			),
+			Date.now(),
+		).slice(0, MAX_HITS);
 		if (hits.length === 0) return "No matching records in the knowledge base.";
 		return hits
-			.map((h) => `### ${h.title} [${h.namespace}]\n${h.text}`)
+			.map((h) => {
+				const when = asOfLabel(h.asOf);
+				return `### ${h.title} [${h.namespace}]${when ? ` (${when})` : ""}\n${h.text}`;
+			})
 			.join("\n\n---\n\n");
 	},
 });

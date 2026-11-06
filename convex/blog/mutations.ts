@@ -43,6 +43,7 @@ async function syncIndex(ctx: MutationCtx, post: Doc<"blogPosts">) {
 			sourceKey: post._id,
 			title: post.title,
 			content: knowledgeContent(post),
+			asOf: post.publishedAt,
 		});
 	} else {
 		await removeDerivedDoc(ctx, "blog", post._id);

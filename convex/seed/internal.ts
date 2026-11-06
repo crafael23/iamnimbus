@@ -104,6 +104,7 @@ export const run = internalMutation({
 				source: "blog",
 				sourceKey: id,
 				title: SAMPLE_POST.title,
+				asOf: publishedAt,
 				content: `Blog post published at /blog/${SAMPLE_POST.slug}\n\n${SAMPLE_POST.excerpt}\n\n${SAMPLE_POST.content}`,
 			});
 			created.push(`post ${SAMPLE_POST.slug}`);

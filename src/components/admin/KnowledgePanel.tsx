@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { type AsOf, asOfLabel } from "../../../convex/_lib/asOf";
 import {
 	Button,
 	errorMessage,
@@ -80,6 +81,7 @@ export function KnowledgePanel() {
 									{doc.namespace}
 									{doc.source !== "manual" && ` / from ${doc.source}`}
 									{` / ${Math.max(1, Math.round(doc.length / 1000))}k chars`}
+									{doc.asOf !== undefined && ` / ${asOfLabel(doc.asOf)}`}
 								</p>
 							</div>
 							<StatusBadge status={doc.status} chunks={doc.chunkCount} error={doc.error} />
@@ -140,6 +142,7 @@ function KnowledgeEditor({
 				namespace: (existing?.namespace ?? "history") as Namespace,
 				title: existing?.title ?? "",
 				content: existing?.content ?? "",
+				asOf: formatAsOf(existing?.asOf),
 			}}
 			status={existing ? { status: existing.status, chunks: existing.chunkCount, error: existing.error } : null}
 			onClose={onClose}
@@ -154,7 +157,7 @@ function KnowledgeForm({
 	onClose,
 }: {
 	docId: Id<"knowledgeDocs"> | null;
-	initial: { namespace: Namespace; title: string; content: string };
+	initial: { namespace: Namespace; title: string; content: string; asOf: string };
 	status: { status: "pending" | "ready" | "error"; chunks?: number; error?: string } | null;
 	onClose: () => void;
 }) {
@@ -168,8 +171,14 @@ function KnowledgeForm({
 		setSaving(true);
 		setError(null);
 		try {
-			if (docId) await update({ docId, title: form.title, content: form.content });
-			else await create(form);
+			const asOf = parseAsOf(form.asOf);
+			if (asOf === null) {
+				setError("Write the as-of date as YYYY or YYYY-MM, or the word current.");
+				return;
+			}
+			const fields = { title: form.title, content: form.content, asOf };
+			if (docId) await update({ docId, ...fields });
+			else await create({ namespace: form.namespace, ...fields });
 			onClose();
 		} catch (e) {
 			setError(errorMessage(e));
@@ -186,7 +195,7 @@ function KnowledgeForm({
 				action={status ? <StatusBadge status={status.status} chunks={status.chunks} error={status.error} /> : undefined}
 			/>
 			<div className="grid gap-5">
-				<div className="grid gap-5 sm:grid-cols-[12rem_1fr]">
+				<div className="grid gap-5 sm:grid-cols-[12rem_1fr_10rem]">
 					<Field label="Namespace" htmlFor="kb-namespace" hint={docId ? "Fixed after creation." : undefined}>
 						<select
 							id="kb-namespace"
@@ -210,6 +219,15 @@ function KnowledgeForm({
 							className={inputClass}
 						/>
 					</Field>
+					<Field label="As of" htmlFor="kb-as-of" hint="YYYY-MM, or current. Recent work ranks higher.">
+						<input
+							id="kb-as-of"
+							value={form.asOf}
+							placeholder="2024-03"
+							onChange={(e) => setForm({ ...form, asOf: e.target.value })}
+							className={inputClass}
+						/>
+					</Field>
 				</div>
 				<Field label="Content" htmlFor="kb-content">
 					<MarkdownEditor id="kb-content" value={form.content} onChange={(content) => setForm({ ...form, content })} />
@@ -226,6 +244,24 @@ function KnowledgeForm({
 			</div>
 		</div>
 	);
+}
+
+function formatAsOf(asOf: AsOf | undefined) {
+	if (asOf === undefined) return "";
+	if (asOf === "current") return "current";
+	return new Date(asOf).toISOString().slice(0, 7);
+}
+
+/** undefined for blank, null when it can't be read. */
+function parseAsOf(text: string): AsOf | undefined | null {
+	const value = text.trim();
+	if (!value) return undefined;
+	if (/^current$/i.test(value)) return "current";
+	const match = value.match(/^(\d{4})(?:-(\d{1,2}))?$/);
+	if (!match) return null;
+	const month = match[2] ? Number(match[2]) : 7;
+	if (month < 1 || month > 12) return null;
+	return Date.UTC(Number(match[1]), month - 1, 1);
 }
 
 export function SkeletonRows() {

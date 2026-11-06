@@ -3,6 +3,7 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import type { vKnowledgeSource } from "../schema";
+import type { AsOf } from "./asOf";
 import type { Namespace } from "./namespaces";
 
 type KnowledgeSource = Infer<typeof vKnowledgeSource>;
@@ -32,6 +33,7 @@ export async function createKnowledgeDoc(
 		content: string;
 		source: KnowledgeSource;
 		sourceKey?: string;
+		asOf?: AsOf;
 	},
 ): Promise<Id<"knowledgeDocs">> {
 	const docId = await ctx.db.insert("knowledgeDocs", {
@@ -117,11 +119,16 @@ export async function upsertDerivedDoc(
 		sourceKey: string;
 		title: string;
 		content: string;
+		asOf?: AsOf;
 	},
 ) {
 	const existing = await findDerivedDoc(ctx, fields.source, fields.sourceKey);
 	if (!existing) {
 		return await createKnowledgeDoc(ctx, fields);
+	}
+	// The date only affects ranking, so changing it needs no re-embedding.
+	if (existing.asOf !== fields.asOf) {
+		await ctx.db.patch(existing._id, { asOf: fields.asOf });
 	}
 	const unchanged =
 		existing.title === fields.title &&

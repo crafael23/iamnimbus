@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
+import { asOfFromYear, asOfLabel, rankByRecency } from "../convex/_lib/asOf";
 import { asUser, scheduled, setup, type T } from "./setup";
 
 beforeEach(() => vi.useFakeTimers());
@@ -61,8 +62,9 @@ describe("blog publishing and the knowledge base", () => {
 		});
 		let docs = await blogDocs(t);
 		const publishedDocId = docs[0]!._id;
+		const post = await t.run((ctx) => ctx.db.get(postId));
 		expect(await t.query(internal.knowledge.queries.existingDocIds, { keys: [publishedDocId] })).toEqual([
-			publishedDocId,
+			{ key: publishedDocId, asOf: post?.publishedAt },
 		]);
 		expect(docs[0]).toMatchObject({ version: 2, status: "pending" });
 		expect(docs[0]?.content).toContain("Revised body.");
@@ -165,6 +167,89 @@ describe("ingestion bookkeeping", () => {
 			admin.mutation(api.knowledge.mutations.update, { docId: doc!._id, title: "x", content: "y" }),
 		).rejects.toThrow(/blog source/);
 		await expect(admin.mutation(api.knowledge.mutations.remove, { docId: doc!._id })).rejects.toThrow(/blog source/);
+	});
+});
+
+describe("as-of dates", () => {
+	const now = Date.UTC(2026, 10, 1);
+
+	test("recent work wins a close call, but a clearly better old match keeps its place", () => {
+		const hits = [
+			{ id: "old-close", score: 0.5, asOf: Date.UTC(2019, 0, 1) },
+			{ id: "current-close", score: 0.48, asOf: "current" as const },
+			{ id: "undated", score: 0.49 },
+		];
+		expect(rankByRecency(hits, now).map((h) => h.id)).toEqual(["current-close", "undated", "old-close"]);
+		const clear = [
+			{ id: "current-vague", score: 0.3, asOf: "current" as const },
+			{ id: "old-exact", score: 0.6, asOf: Date.UTC(2019, 0, 1) },
+		];
+		expect(rankByRecency(clear, now).map((h) => h.id)).toEqual(["old-exact", "current-vague"]);
+	});
+
+	test("labels and project years", () => {
+		expect(asOfLabel("current")).toBe("current");
+		expect(asOfLabel(Date.UTC(2024, 2, 1))).toBe("as of Mar 2024");
+		expect(asOfLabel(undefined)).toBeNull();
+		expect(asOfFromYear("2022–present")).toBe("current");
+		expect(asOfFromYear("2021-2023")).toBe(Date.UTC(2023, 6, 1));
+		expect(asOfFromYear("someday")).toBeUndefined();
+	});
+
+	test("manual docs keep, change or clear their date; nonsense dates are refused", async () => {
+		const t = setup();
+		const admin = await asUser(t, "user_admin", "admin");
+		const docId = await admin.mutation(api.knowledge.mutations.create, {
+			namespace: "projects",
+			title: "Reach",
+			content: "x",
+			asOf: "current",
+		});
+		expect(await t.query(internal.knowledge.queries.existingDocIds, { keys: [docId] })).toEqual([
+			{ key: docId, asOf: "current" },
+		]);
+		await admin.mutation(api.knowledge.mutations.reingest, { docId });
+		expect((await t.run((ctx) => ctx.db.get(docId)))?.asOf).toBe("current");
+		await admin.mutation(api.knowledge.mutations.update, { docId, title: "Reach", content: "x", asOf: 0 });
+		expect((await t.run((ctx) => ctx.db.get(docId)))?.asOf).toBe(0);
+		await admin.mutation(api.knowledge.mutations.update, { docId, title: "Reach", content: "x" });
+		expect((await t.run((ctx) => ctx.db.get(docId)))?.asOf).toBeUndefined();
+		await expect(
+			admin.mutation(api.knowledge.mutations.update, {
+				docId,
+				title: "Reach",
+				content: "x",
+				asOf: Date.UTC(2099, 0, 1),
+			}),
+		).rejects.toThrow(/as-of date/);
+	});
+
+	test("a derived doc's date follows its source", async () => {
+		const t = setup();
+		const admin = await asUser(t, "user_admin", "admin");
+		const fields = {
+			slug: "grid",
+			title: "Grid",
+			summary: "A terminal.",
+			problem: "P",
+			solution: "S",
+			stack: ["Convex"],
+			decisions: "D",
+			outcome: "O",
+			order: 0,
+			year: "2021",
+		};
+		const projectId = await admin.mutation(api.projects.mutations.save, fields);
+		const doc = () =>
+			t.run((ctx) =>
+				ctx.db
+					.query("knowledgeDocs")
+					.withIndex("by_source", (q) => q.eq("source", "project").eq("sourceKey", projectId))
+					.unique(),
+			);
+		expect(await doc()).toMatchObject({ asOf: Date.UTC(2021, 6, 1), version: 1 });
+		await admin.mutation(api.projects.mutations.save, { ...fields, projectId, year: "2024–present" });
+		expect((await doc())?.asOf).toBe("current");
 	});
 });
 

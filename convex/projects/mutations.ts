@@ -3,6 +3,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { adminMutation } from "../_lib/customFunctions";
 import { findRepo, projectForRepo, refreshRepoDoc, repoKey, repoUrlFor } from "../_lib/github";
+import { asOfFromYear } from "../_lib/asOf";
 import { removeDerivedDoc, upsertDerivedDoc } from "../_lib/knowledge";
 import { assertSlug } from "../_lib/slug";
 
@@ -109,6 +110,7 @@ export const save = adminMutation({
 			sourceKey: id,
 			title: clean.title,
 			content: knowledgeContent(clean),
+			asOf: asOfFromYear(clean.year),
 		});
 		// Both repos' docs name (or stop naming) this project.
 		if (previousRepo && repoKey(previousRepo) !== clean.githubRepo) {

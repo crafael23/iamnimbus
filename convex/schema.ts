@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { eventFields } from "./_lib/analytics";
+import { vAsOf } from "./_lib/asOf";
 import { vNamespace } from "./_lib/namespaces";
 
 export const vKnowledgeSource = v.union(
@@ -50,6 +51,8 @@ export default defineSchema({
 		content: v.string(),
 		source: vKnowledgeSource,
 		sourceKey: v.optional(v.string()),
+		/** When the doc was last true; search ranks recent work higher. Not embedded. */
+		asOf: v.optional(vAsOf),
 		status: vIngestStatus,
 		error: v.optional(v.string()),
 		version: v.number(),

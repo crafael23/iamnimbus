@@ -88,5 +88,6 @@ export async function refreshRepoDoc(ctx: MutationCtx, fullName: string) {
 		sourceKey: repo.fullName,
 		title: `${repo.name} (GitHub)`,
 		content: repoDocContent(repo, project),
+		asOf: repo.pushedAt,
 	});
 }

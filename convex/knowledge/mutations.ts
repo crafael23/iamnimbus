@@ -8,22 +8,31 @@ import {
 	reingestKnowledgeDoc,
 	updateKnowledgeDoc,
 } from "../_lib/knowledge";
+import { vAsOf, type AsOf } from "../_lib/asOf";
 import { vNamespace } from "../_lib/rag";
 
 const MAX_DOC_LENGTH = 200_000;
 
-function validate(title: string, content: string) {
+function validate(title: string, content: string, asOf: AsOf | undefined) {
 	if (!title.trim()) throw new ConvexError("Title is required");
 	if (content.length > MAX_DOC_LENGTH) {
 		throw new ConvexError("Document is too long");
+	}
+	if (typeof asOf === "number" && !(asOf >= Date.UTC(1970, 0, 1) && asOf <= Date.now() + 366 * 86_400_000)) {
+		throw new ConvexError("The as-of date must be a real date, at most a year ahead");
 	}
 }
 
 /** Manual docs only. Blog, project and GitHub docs are edited at their source. */
 export const create = adminMutation({
-	args: { namespace: vNamespace, title: v.string(), content: v.string() },
+	args: {
+		namespace: vNamespace,
+		title: v.string(),
+		content: v.string(),
+		asOf: v.optional(vAsOf),
+	},
 	handler: async (ctx, args) => {
-		validate(args.title, args.content);
+		validate(args.title, args.content, args.asOf);
 		return await createKnowledgeDoc(ctx, { ...args, source: "manual" });
 	},
 });
@@ -33,14 +42,17 @@ export const update = adminMutation({
 		docId: v.id("knowledgeDocs"),
 		title: v.string(),
 		content: v.string(),
+		/** Omitted clears the date. */
+		asOf: v.optional(vAsOf),
 	},
-	handler: async (ctx, { docId, title, content }) => {
-		validate(title, content);
+	handler: async (ctx, { docId, title, content, asOf }) => {
+		validate(title, content, asOf);
 		const doc = await ctx.db.get(docId);
 		if (!doc) throw new ConvexError("Document not found");
 		if (doc.source !== "manual") {
 			throw new ConvexError(`Edit this document from its ${doc.source} source`);
 		}
+		if (doc.asOf !== asOf) await ctx.db.patch(docId, { asOf });
 		await updateKnowledgeDoc(ctx, doc, { title, content });
 	},
 });

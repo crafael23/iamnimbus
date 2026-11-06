@@ -9,7 +9,6 @@ export { NAMESPACES, vNamespace, type Namespace } from "./namespaces";
 export const EMBEDDING_MODEL = "openai/text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
 
-
 export const textEmbeddingModel = () =>
 	convexGateway.embeddingModel(EMBEDDING_MODEL);
 
@@ -34,14 +33,15 @@ export type KnowledgeHit = {
 };
 
 /**
- * Semantic search over one namespace, or all of them. For "all", the query is
- * embedded once and the vector is reused for each namespace search.
+ * Semantic search over one namespace, or all of them, best match first. For
+ * "all", the query is embedded once and the vector is reused for each
+ * namespace search. Returns every candidate (up to four per namespace) so the
+ * caller can drop dead docs and re-rank by date before cutting the list.
  */
 export async function searchKnowledgeBase(
 	ctx: SearchCtx,
-	args: { query: string; namespace?: Namespace; limit?: number },
+	args: { query: string; namespace?: Namespace },
 ): Promise<KnowledgeHit[]> {
-	const limit = args.limit ?? 6;
 	const namespaces = args.namespace ? [args.namespace] : [...NAMESPACES];
 	let query: string | number[] = args.query;
 	if (namespaces.length > 1) {
@@ -70,8 +70,5 @@ export async function searchKnowledgeBase(
 			}));
 		}),
 	);
-	return perNamespace
-		.flat()
-		.sort((a, b) => b.score - a.score)
-		.slice(0, limit);
+	return perNamespace.flat().sort((a, b) => b.score - a.score);
 }
