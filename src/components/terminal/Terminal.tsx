@@ -337,8 +337,12 @@ export function Terminal() {
 					aria-relevant="additions"
 					className="crt-text mx-auto w-full max-w-[860px] px-5 sm:px-10"
 				>
-					{cleared === 0 && (
+					{cleared === 0 ? (
 						<BootSequence lines={bootLines} instant={booted} onDone={finishBoot} />
+					) : (
+						<p className="line-in pt-10 text-[19px] text-dim sm:pt-16 sm:text-[21px]">
+							{"// "}screen cleared. The conversation is still in memory.
+						</p>
 					)}
 					{bootDone && (
 						<>
