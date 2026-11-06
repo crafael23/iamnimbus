@@ -10,7 +10,7 @@ export function ProfileLinks({ className = "" }: { className?: string }) {
 					href={link.href}
 					target="_blank"
 					rel="me noopener noreferrer"
-					className="lowercase text-cyan underline decoration-cyan/40 underline-offset-4 transition-colors hover:text-ice hover:decoration-ice"
+					className="lowercase text-dim transition-colors hover:text-cyan"
 				>
 					{link.label} ↗
 				</a>

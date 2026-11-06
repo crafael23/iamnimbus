@@ -10,8 +10,7 @@ export function PageShell({ children }: { children: ReactNode }) {
 			<main className="screen-in crt-text relative z-10 mx-auto max-w-[1100px] px-5 pb-16 pt-12 sm:px-8 sm:pt-20">
 				{children}
 			</main>
-			<footer className="crt-text relative z-10 mx-auto flex max-w-[1100px] flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-dashed border-line-strong px-5 pb-20 pt-6 font-crt text-[18px] sm:px-8">
-				<span className="uppercase tracking-[0.1em] text-dim">elsewhere</span>
+			<footer className="crt-text relative z-10 mx-auto max-w-[1100px] px-5 pb-16 font-crt text-[17px] sm:px-8">
 				<ProfileLinks />
 			</footer>
 		</div>

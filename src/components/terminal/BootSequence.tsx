@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ProfileLinks } from "@/components/ProfileLinks";
+import { PROFILE_LINKS } from "../../../convex/_lib/profile";
 
 export type BootLine = { label: string; value: string };
 
@@ -27,8 +27,8 @@ export function BootSequence({
 	instant: boolean;
 	onDone: () => void;
 }) {
-	// wordmark, each line, the profiles, the whisper, the hint
-	const total = lines.length + 4;
+	// wordmark, each line, the whisper, the hint
+	const total = lines.length + 3;
 	const [shown, setShown] = useState(instant ? total : 0);
 	const [powering, setPowering] = useState(!instant);
 	const done = shown >= total;
@@ -82,26 +82,32 @@ export function BootSequence({
 					<span className="glow-text">nimbus</span>
 				</h1>
 			)}
-			<dl className="mt-8 grid grid-cols-[9ch_1fr] gap-x-3 text-[19px] leading-snug sm:text-[21px]">
-				{lines.slice(0, Math.max(0, shown - 1)).map((line) => (
-					<div key={line.label} className="contents">
-						<dt className={`${animate ? "line-in" : ""} text-dim`}>{line.label}</dt>
-						<dd
-							className={animate ? "type-in" : ""}
-							style={chars(line.value.length + 4)}
-						>
-							{line.value}
-						</dd>
-					</div>
-				))}
-				{shown >= lines.length + 2 && (
-					<>
-						<dt className={`${animate ? "line-in" : ""} text-dim`}>elsewhere</dt>
-						<dd className={animate ? "line-in" : ""}>
-							<ProfileLinks />
-						</dd>
-					</>
-				)}
+			{/* Status lines, with the owner's profiles tucked into a quiet right column. */}
+			<dl className="mt-8 grid max-w-[44rem] grid-cols-[9ch_1fr_auto] gap-x-3 text-[19px] leading-snug sm:text-[21px]">
+				{lines.slice(0, Math.max(0, shown - 1)).map((line, i) => {
+					const profile = PROFILE_LINKS[i];
+					return (
+						<div key={line.label} className="contents">
+							<dt className={`${animate ? "line-in" : ""} text-dim`}>{line.label}</dt>
+							<dd
+								className={`${animate ? "type-in" : ""} ${profile ? "" : "col-span-2"}`}
+								style={chars(line.value.length + 4)}
+							>
+								{line.value}
+							</dd>
+							{profile && (
+								<a
+									href={profile.href}
+									target="_blank"
+									rel="me noopener noreferrer"
+									className={`${animate ? "line-in" : ""} justify-self-end lowercase text-dim transition-colors hover:text-cyan`}
+								>
+									{profile.label} ↗
+								</a>
+							)}
+						</div>
+					);
+				})}
 			</dl>
 			{shown >= lines.length + 3 && (
 				<p
