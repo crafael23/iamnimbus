@@ -8,6 +8,10 @@ export const lastRun = adminQuery({
 		return {
 			run,
 			username: process.env.GITHUB_USERNAME ?? null,
+			orgs: (process.env.GITHUB_ORGS ?? "")
+				.split(",")
+				.map((o) => o.trim())
+				.filter(Boolean),
 			hasToken: Boolean(process.env.GITHUB_TOKEN),
 		};
 	},

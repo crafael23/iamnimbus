@@ -191,3 +191,79 @@ describe("projects linked to GitHub repos", () => {
 		expect(options.find((o) => o.fullName === "owner/beta")?.linkedProject).toBeNull();
 	});
 });
+
+describe("the GitHub sync", () => {
+	const gh = (
+		fullName: string,
+		extra: Partial<{ private: boolean; fork: boolean; pushed_at: string }> = {},
+	) => ({
+		name: fullName.split("/")[1],
+		full_name: fullName,
+		private: false,
+		fork: false,
+		description: null,
+		html_url: `https://github.com/${fullName}`,
+		homepage: null,
+		language: "TypeScript",
+		languages_url: `https://api.github.com/repos/${fullName}/languages`,
+		stargazers_count: 0,
+		forks_count: 0,
+		topics: [],
+		archived: false,
+		created_at: "2025-01-01T00:00:00Z",
+		pushed_at: "2026-01-01T00:00:00Z",
+		...extra,
+	});
+
+	// What a fake GitHub returns for each path; anything else is a 404.
+	const routes: Record<string, unknown> = {
+		"/users/me/repos": [gh("me/site"), gh("me/secret", { private: true }), gh("me/forked", { fork: true })],
+		"/users/me/orgs": [],
+		"/orgs/acme/repos": [gh("acme/tool"), gh("acme/untouched"), gh("acme/internal", { private: true })],
+		"/repos/acme/tool/commits": [{ sha: "1" }],
+		"/repos/acme/untouched/commits": [],
+		"/repos/acme/internal/commits": [{ sha: "2" }],
+		"/repos/me/site/languages": { TypeScript: 900, CSS: 100 },
+		"/repos/acme/tool/languages": { Go: 1 },
+	};
+
+	beforeEach(() => {
+		process.env.GITHUB_USERNAME = "me";
+		process.env.GITHUB_ORGS = "acme";
+		vi.stubGlobal("fetch", async (input: string | URL) => {
+			const path = new URL(String(input)).pathname;
+			return path in routes
+				? new Response(JSON.stringify(routes[path]), { status: 200 })
+				: new Response("not found", { status: 404 });
+		});
+	});
+	afterEach(() => {
+		delete process.env.GITHUB_USERNAME;
+		delete process.env.GITHUB_ORGS;
+		vi.unstubAllGlobals();
+	});
+
+	test("syncs own public repos and org repos with my commits, never private ones", async () => {
+		const t = setup();
+		const admin = await asUser(t, "user_admin", "admin");
+		const result = await admin.action(api.github.actions.sync, {});
+		expect(result).toMatchObject({ synced: 2, orgs: ["acme"] });
+
+		const rows = await t.run((ctx) => ctx.db.query("githubRepos").collect());
+		expect(rows.map((r) => r.fullName).toSorted((a, b) => a.localeCompare(b))).toEqual(["acme/tool", "me/site"]);
+		expect(rows.find((r) => r.fullName === "me/site")?.languages).toEqual([
+			{ name: "TypeScript", percent: 90 },
+			{ name: "CSS", percent: 10 },
+		]);
+		const docs = await t.run((ctx) =>
+			ctx.db
+				.query("knowledgeDocs")
+				.withIndex("by_source", (q) => q.eq("source", "github"))
+				.collect(),
+		);
+		expect(docs.map((d) => d.sourceKey).toSorted((a, b) => String(a).localeCompare(String(b)))).toEqual([
+			"acme/tool",
+			"me/site",
+		]);
+	});
+});

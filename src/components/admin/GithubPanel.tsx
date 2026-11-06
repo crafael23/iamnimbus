@@ -20,7 +20,11 @@ export function GithubPanel() {
 		setResult(null);
 		try {
 			const r = await sync({});
-			setResult(`Synced ${r.synced} repositories${r.removed ? `, removed ${r.removed}` : ""}.`);
+			setResult(
+				`Synced ${r.synced} repositories${r.removed ? `, removed ${r.removed}` : ""}${
+					r.orgs.length ? ` (organizations scanned: ${r.orgs.join(", ")})` : ""
+				}.`,
+			);
 		} catch (e) {
 			setError(errorMessage(e));
 		} finally {
@@ -32,7 +36,7 @@ export function GithubPanel() {
 		<div>
 			<PanelHeader
 				title="GitHub"
-				description="Pulls public, non-fork repositories (description, languages, stars, recency and README) into the github namespace. Unchanged repositories are not re-embedded."
+				description="Pulls your public, non-fork repositories, plus public repositories in your organizations that you have committed to (description, languages, stars, recency and README). Private repositories are never synced. Unchanged repositories are not re-embedded."
 				action={
 					<Button tone="primary" onClick={() => void run()} disabled={busy || !info?.username}>
 						{busy ? "Syncing…" : "Sync now"}
@@ -42,10 +46,16 @@ export function GithubPanel() {
 			{info === undefined ? (
 				<SkeletonRows />
 			) : (
-				<dl className="grid gap-6 text-[13px] sm:grid-cols-3">
+				<dl className="grid gap-6 text-[13px] sm:grid-cols-4">
 					<div>
 						<dt className="text-dim">account</dt>
 						<dd className="mt-1 text-ice">{info.username ?? "GITHUB_USERNAME not set"}</dd>
+					</div>
+					<div>
+						<dt className="text-dim">organizations</dt>
+						<dd className="mt-1 text-ice">
+							{info.orgs.length ? info.orgs.join(", ") : "public memberships only (set GITHUB_ORGS)"}
+						</dd>
 					</div>
 					<div>
 						<dt className="text-dim">token</dt>
