@@ -210,8 +210,10 @@ describe("as-of dates", () => {
 		]);
 		await admin.mutation(api.knowledge.mutations.reingest, { docId });
 		expect((await t.run((ctx) => ctx.db.get(docId)))?.asOf).toBe("current");
+		const versionBefore = (await t.run((ctx) => ctx.db.get(docId)))?.version;
 		await admin.mutation(api.knowledge.mutations.update, { docId, title: "Reach", content: "x", asOf: 0 });
-		expect((await t.run((ctx) => ctx.db.get(docId)))?.asOf).toBe(0);
+		// A date-only change keeps the version: nothing is re-embedded.
+		expect(await t.run((ctx) => ctx.db.get(docId))).toMatchObject({ asOf: 0, version: versionBefore });
 		await admin.mutation(api.knowledge.mutations.update, { docId, title: "Reach", content: "x" });
 		expect((await t.run((ctx) => ctx.db.get(docId)))?.asOf).toBeUndefined();
 		await expect(

@@ -74,13 +74,19 @@ export function Terminal() {
 
 	const conversionSent = useRef(false);
 	const convertGuest = useMutation(api.analytics.mutations.convertGuest);
+	// On a first sign-in the WorkOS webhook may not have created the user row
+	// yet, and convertGuest needs it: wait until the profile exists.
+	const profile = useQuery(
+		api.users.queries.getMyProfileOrNull,
+		isAuthenticated ? {} : "skip",
+	);
 	useEffect(() => {
-		if (!isAuthenticated || conversionSent.current) return;
+		if (!profile || conversionSent.current) return;
 		conversionSent.current = true;
 		void guestToken()
 			.then((token) => convertGuest({ guestToken: token }))
 			.catch(() => {});
-	}, [isAuthenticated, convertGuest]);
+	}, [profile, convertGuest]);
 
 	const startThread = useMutation(api.chat.mutations.startThread);
 	const sendMessage = useMutation(

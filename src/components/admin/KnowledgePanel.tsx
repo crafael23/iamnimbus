@@ -235,7 +235,7 @@ function KnowledgeForm({
 				{error && <p className="text-[13px] text-danger">{error}</p>}
 				<div className="flex gap-2">
 					<Button tone="primary" onClick={() => void save()} disabled={saving || !form.title.trim()}>
-						{saving ? "Saving…" : docId ? "Save and re-index" : "Save and index"}
+						{saving ? "Saving…" : docId ? "Save" : "Save and index"}
 					</Button>
 					<Button tone="ghost" onClick={onClose}>
 						Cancel

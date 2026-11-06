@@ -52,8 +52,11 @@ export const update = adminMutation({
 		if (doc.source !== "manual") {
 			throw new ConvexError(`Edit this document from its ${doc.source} source`);
 		}
+		// The date only affects ranking: changing it alone needs no re-embedding.
 		if (doc.asOf !== asOf) await ctx.db.patch(docId, { asOf });
-		await updateKnowledgeDoc(ctx, doc, { title, content });
+		if (doc.title !== title || doc.content !== content) {
+			await updateKnowledgeDoc(ctx, doc, { title, content });
+		}
 	},
 });
 
