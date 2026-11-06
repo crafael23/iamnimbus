@@ -84,6 +84,9 @@ export const { authKitEvent } = authKit.events({
 	},
 });
 
+/** Revoked membership ids remembered per user. */
+const MAX_REVOKED = 20;
+
 type MembershipData = {
 	id?: string;
 	user_id?: string;
@@ -99,7 +102,8 @@ type MembershipData = {
 
 /**
  * Apply one membership event to the user's role. Webhooks can arrive late,
- * twice or out of order, so: a deleted membership is remembered and never
+ * twice or out of order, so: every deleted membership is remembered (the
+ * latest MAX_REVOKED) and never
  * restored by a later event for the same membership (re-inviting the user
  * creates a new membership id), and an update older than the one already
  * applied is ignored.
@@ -120,7 +124,8 @@ async function syncMembershipRole(ctx: MutationCtx, data: unknown, deleted: bool
 
 	const membershipId = m.id;
 	const updatedAt = Date.parse(m.updatedAt ?? m.updated_at ?? "") || undefined;
-	if (!deleted && membershipId && user.revokedMembershipId === membershipId) return;
+	const revoked = user.revokedMembershipIds ?? [];
+	if (!deleted && membershipId && revoked.includes(membershipId)) return;
 	// Deletions always apply; only grants and updates can be stale.
 	if (
 		!deleted &&
@@ -138,7 +143,10 @@ async function syncMembershipRole(ctx: MutationCtx, data: unknown, deleted: bool
 		role: active ? (m.role?.slug ?? m.roles?.[0]?.slug) : undefined,
 		membershipId: membershipId ?? user.membershipId,
 		membershipUpdatedAt: updatedAt ?? user.membershipUpdatedAt,
-		revokedMembershipId: deleted ? membershipId : user.revokedMembershipId,
+		revokedMembershipIds:
+			deleted && membershipId && !revoked.includes(membershipId)
+				? [...revoked, membershipId].slice(-MAX_REVOKED)
+				: user.revokedMembershipIds,
 		updatedAt: Date.now(),
 	});
 }

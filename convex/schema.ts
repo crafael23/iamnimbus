@@ -25,10 +25,10 @@ export default defineSchema({
 		role: v.optional(v.string()), // WorkOS org membership role slug (member, admin, etc.)
 		// Ordering for membership webhooks, which can arrive late or twice:
 		// the membership the role came from, its last update, and the last
-		// deleted membership (never resurrected by a stale event).
+		// deleted memberships (never resurrected by a stale event).
 		membershipId: v.optional(v.string()),
 		membershipUpdatedAt: v.optional(v.number()),
-		revokedMembershipId: v.optional(v.string()),
+		revokedMembershipIds: v.optional(v.array(v.string())),
 		createdAt: v.number(),
 		updatedAt: v.optional(v.number()),
 	})

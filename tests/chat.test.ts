@@ -259,10 +259,20 @@ describe("message limits", () => {
 		expect(
 			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) })),
 		).toBe("BUSY");
+		// The reply job stalls (cancelled here so the clock does not run it).
+		const stalled = (await scheduled(t)).find((j) => j.name.includes("generateResponse"));
+		await t.run((ctx) => ctx.scheduler.cancel(stalled!._id));
 		vi.advanceTimersByTime(2 * 60 * 1000 + 1);
 		expect(
 			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) })),
 		).toBe("OK");
+		// The abandoned, never-judged prompt is fenced out of history.
+		const { page } = await t.query(api.chat.queries.listThreadMessages, {
+			threadId,
+			guestToken: await tok(GUEST_A),
+			paginationOpts: { numItems: 10, cursor: null },
+		});
+		expect(page.map((m) => m.text)).toEqual(["[not sent: the safety check did not finish]", "second"]);
 	});
 
 	test("a rejected guest message does not consume the session's allowance", async () => {

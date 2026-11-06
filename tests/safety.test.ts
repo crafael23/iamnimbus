@@ -174,6 +174,43 @@ describe("the AI budget", () => {
 		expect(await t.run((ctx) => ctx.db.query("aiReservations").collect())).toHaveLength(1);
 	});
 
+	test("a reply whose hold expired while queued must reserve again, or it does not run", async () => {
+		const t = setup();
+		await t.run(async (ctx) => {
+			await ctx.db.insert("aiSpend", { period: periods(Date.now()).day, costUsd: 2.97, calls: 1 });
+		});
+		const first = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		await t.mutation(api.chat.mutations.sendMessage, {
+			threadId: first.threadId,
+			prompt: "queued",
+			guestToken: await tok(GUEST_A),
+		});
+		const queued = (await scheduled(t)).find((j) => j.name.includes("generateResponse"));
+		if (!queued) throw new Error("no job");
+		// The job stalls in the queue (cancelled so the clock does not run it);
+		// its hold expires, and a second turn takes the remaining budget.
+		await t.run((ctx) => ctx.scheduler.cancel(queued._id));
+		vi.advanceTimersByTime(15 * 60 * 1000 + 1);
+		const otherGuest = "eeeeeeee-5555-4555-8555-eeeeeeeeeeee";
+		const second = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(otherGuest) });
+		await t.mutation(api.chat.mutations.sendMessage, {
+			threadId: second.threadId,
+			prompt: "hi",
+			guestToken: await tok(otherGuest),
+		});
+		// The stale job now runs: no hold, no room, no model call.
+		await t.action(internal.chat.actions.generateResponse, queued.args[0] as never);
+		const { page } = await t.query(api.chat.queries.listThreadMessages, {
+			threadId: first.threadId,
+			guestToken: await tok(GUEST_A),
+			paginationOpts: { numItems: 10, cursor: null },
+		});
+		expect(page.map((m) => m.text)).toEqual([
+			"[not sent: over budget]",
+			expect.stringMatching(/power budget/),
+		]);
+	});
+
 	test("held amounts from turns in flight count against the limit", async () => {
 		const t = setup();
 		await t.run(async (ctx) => {
@@ -291,6 +328,22 @@ describe("WorkOS membership events", () => {
 			data: at("2026-11-03T00:00:00Z", { id: "om_2" }),
 		});
 		expect(await roleOf(t)).toBe("admin");
+	});
+
+	test("every revoked membership stays revoked, not just the latest", async () => {
+		const t = setup();
+		await asUser(t, "user_admin", "admin");
+		const event = (name: string, id: string, iso: string) =>
+			t.mutation(internal.auth.authKitEvent, {
+				event: `organization_membership.${name}`,
+				data: { ...membership(), id, updated_at: iso },
+			});
+		await event("deleted", "om_a", "2026-11-02T00:00:00Z");
+		await event("created", "om_b", "2026-11-03T00:00:00Z");
+		await event("deleted", "om_b", "2026-11-04T00:00:00Z");
+		// A's delayed update arrives last.
+		await event("updated", "om_a", "2026-11-01T00:00:00Z");
+		expect(await roleOf(t)).toBeNull();
 	});
 
 	test("an update older than the one applied is ignored", async () => {

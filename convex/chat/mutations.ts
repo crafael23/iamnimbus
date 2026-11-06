@@ -15,6 +15,7 @@ import {
 const MAX_PROMPT_LENGTH = 2000;
 /** How long an unanswered message blocks its thread (a crashed turn unblocks after this). */
 const TURN_LOCK_MS = 2 * 60 * 1000;
+const ABANDONED_PROMPT = "[not sent: the safety check did not finish]";
 
 /**
  * Registered users resume their latest thread (it persists across visits).
@@ -81,8 +82,16 @@ export const sendMessage = mutation({
 			{ threadId, order: "desc", paginationOpts: { numItems: 1, cursor: null } },
 		);
 		const last = latest[0];
-		if (last?.message?.role === "user" && Date.now() - last._creationTime < TURN_LOCK_MS) {
-			throw new ConvexError({ code: "BUSY" });
+		if (last?.message?.role === "user") {
+			if (Date.now() - last._creationTime < TURN_LOCK_MS) {
+				throw new ConvexError({ code: "BUSY" });
+			}
+			// An abandoned turn: its prompt was never judged. Fence it out of
+			// history before this turn can load it as context.
+			await ctx.runMutation(components.agent.messages.updateMessage, {
+				messageId: last._id,
+				patch: { message: { role: "user", content: ABANDONED_PROMPT } },
+			});
 		}
 		// Hold this turn's worst-case cost; throws BUDGET if it would not fit.
 		// Any later throw rolls the hold back with everything else.

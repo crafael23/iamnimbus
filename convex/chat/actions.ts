@@ -1,6 +1,7 @@
 import { saveMessage } from "@convex-dev/agent";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { type ActionCtx, internalAction } from "../_generated/server";
 import { buildSystemPrompt } from "../_lib/persona";
 import { checkContent } from "../_lib/safety";
@@ -12,10 +13,13 @@ const WITHHELD_REPLY = "This reply was withheld by a safety check. Try asking an
 const JUDGE_DOWN =
 	"The safety check is not answering right now, so nothing was sent. Try again in a minute.";
 const TURN_FAILED = "Transmission lost. Send the message again.";
+const OUT_OF_BUDGET =
+	"The terminal has used its power budget for now and is resting. Projects and writing are still open.";
 
 /** Shown in the thread in place of a message that never reached the model. */
 const WITHHELD_PROMPT = "[withheld by the safety check]";
 const UNCHECKED_PROMPT = "[not sent: the safety check was unavailable]";
+const UNFUNDED_PROMPT = "[not sent: over budget]";
 
 /**
  * Answer a saved prompt behind two Jev gates (convex/_lib/safety.ts):
@@ -47,6 +51,7 @@ export const generateResponse = internalAction({
 	handler: async (ctx, args) => {
 		const agent = agents[args.tier];
 		const turn = { approved: false, replied: false, unrecorded: false };
+		let hold: Id<"aiReservations"> | null = null;
 		const reply = async (text: string) => {
 			await saveMessage(ctx, components.agent, {
 				threadId: args.threadId,
@@ -67,6 +72,19 @@ export const generateResponse = internalAction({
 		};
 
 		try {
+			// The hold may have expired while this job was queued: claim it again,
+			// or stop here if the budget no longer fits.
+			hold = await ctx.runMutation(internal.billing.internal.claim, {
+				reservationId: args.reservationId,
+				tier: args.tier,
+			});
+			if (!hold) {
+				await replacePrompt(ctx, args.promptMessageId, UNFUNDED_PROMPT);
+				turn.approved = true;
+				await reply(OUT_OF_BUDGET);
+				return null;
+			}
+
 			const inbound = await checkContent("visitor", { message: args.prompt });
 			await charge(inbound.cost);
 			if (inbound.flagged) {
@@ -110,12 +128,11 @@ export const generateResponse = internalAction({
 			}
 		} finally {
 			// If this fails too, the hold simply expires (RESERVATION_TTL_MS).
-			await ctx
-				.runMutation(internal.billing.internal.release, {
-					reservationId: args.reservationId,
-					charge: turn.unrecorded,
-				})
-				.catch((e: unknown) => console.error("could not release budget hold", e));
+			if (hold) {
+				await ctx
+					.runMutation(internal.billing.internal.release, { reservationId: hold, charge: turn.unrecorded })
+					.catch((e: unknown) => console.error("could not release budget hold", e));
+			}
 		}
 		return null;
 	},

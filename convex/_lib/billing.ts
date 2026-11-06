@@ -58,7 +58,8 @@ export async function spendStatus(ctx: QueryCtx, now = Date.now()) {
  * output caps (chat/agent.ts), plus the two judge calls, rounded up.
  */
 export const TURN_RESERVE_USD: Record<Tier, number> = { guest: 0.02, registered: 0.5 };
-export const RESERVATION_TTL_MS = 10 * 60 * 1000;
+/** Longer than any action can run; a reply re-claims its hold when it starts. */
+export const RESERVATION_TTL_MS = 15 * 60 * 1000;
 
 async function heldNow(ctx: QueryCtx, now: number) {
 	const rows = await ctx.db
