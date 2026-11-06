@@ -19,10 +19,10 @@ import { SiteNav } from "@/components/SiteNav";
 import { api } from "../../../convex/_generated/api";
 import { BootSequence, type BootLine } from "./BootSequence";
 import { COMMANDS, matchCommands } from "./commands";
+import { guestToken } from "./guestToken";
 import { AwaitingReply, ProgramReply, UserLine } from "./Message";
 import {
 	clearedAt,
-	guestSessionId,
 	hasBooted,
 	markBooted,
 	saveClearedAt,
@@ -45,7 +45,6 @@ const prefersReducedMotion = () =>
 export function Terminal() {
 	const { user } = useAuth();
 	const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-	const guestId = useMemo(() => guestSessionId(), []);
 
 	const [threadId, setThreadId] = useState<string | null>(null);
 	const [booted, setBooted] = useState(() => hasBooted() || prefersReducedMotion());
@@ -55,6 +54,12 @@ export function Terminal() {
 	const [lines, setLines] = useState<LocalLine[]>([]);
 	const [cleared, setCleared] = useState(0);
 	const [gateCode, setGateCode] = useState<string | null>(null);
+	const [linkFailed, setLinkFailed] = useState(false);
+	/**
+	 * The guest token reads subscribe with. Kept for the page's life (the
+	 * server accepts it for reads after expiry); writes fetch a current one.
+	 */
+	const [readToken, setReadToken] = useState<string | null>(null);
 	const lineId = useRef(0);
 
 	const startThread = useMutation(api.chat.mutations.startThread);
@@ -67,16 +72,40 @@ export function Terminal() {
 		}),
 	);
 
-	const session = useQuery(api.chat.queries.session, { guestSessionId: guestId });
+	const asGuest = !authLoading && !isAuthenticated;
+	const tokenArg = asGuest ? (readToken ?? undefined) : undefined;
+	const session = useQuery(
+		api.chat.queries.session,
+		authLoading || (asGuest && !readToken) ? "skip" : { guestToken: tokenArg },
+	);
+
+	// Guests: get a signed guest link from the server before anything else.
+	useEffect(() => {
+		if (!asGuest || readToken) return;
+		let cancelled = false;
+		guestToken()
+			.then((token) => {
+				if (!cancelled) setReadToken(token);
+			})
+			.catch(() => {
+				if (!cancelled) setLinkFailed(true);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [asGuest, readToken]);
 
 	// Open (or resume) the visitor's thread whenever the auth state settles.
 	useEffect(() => {
-		if (authLoading) return;
+		if (authLoading || (!isAuthenticated && !readToken)) return;
 		let cancelled = false;
-		startThread({
-			guestSessionId: guestId,
-			resume: isAuthenticated ? undefined : savedGuestThread(),
-		})
+		(isAuthenticated ? Promise.resolve(undefined) : guestToken())
+			.then((token) =>
+				startThread({
+					guestToken: token,
+					resume: isAuthenticated ? undefined : savedGuestThread(),
+				}),
+			)
 			.then(({ threadId: id }) => {
 				if (cancelled) return;
 				if (!isAuthenticated) saveGuestThread(id);
@@ -89,11 +118,11 @@ export function Terminal() {
 		return () => {
 			cancelled = true;
 		};
-	}, [authLoading, isAuthenticated, guestId, startThread]);
+	}, [authLoading, isAuthenticated, readToken, startThread]);
 
 	const { results: messages } = useUIMessages(
 		api.chat.queries.listThreadMessages,
-		threadId ? { threadId, guestSessionId: guestId } : "skip",
+		threadId ? { threadId, guestToken: tokenArg } : "skip",
 		{ initialNumItems: 60, stream: true },
 	);
 
@@ -109,7 +138,8 @@ export function Terminal() {
 	const tier = session?.tier ?? (isAuthenticated ? "registered" : "guest");
 	const outOfMessages = session ? session.remaining <= 0 : false;
 	const gated =
-		(tier === "guest" && (outOfMessages || gateCode === "GUEST_LIMIT")) &&
+		tier === "guest" &&
+		(outOfMessages || gateCode === "GUEST_LIMIT" || gateCode === "NETWORK_LIMIT") &&
 		!replying;
 	const handle = tier === "guest" ? "guest" : (user?.firstName?.toLowerCase() ?? "you");
 
@@ -185,13 +215,17 @@ export function Terminal() {
 		}
 		if (!threadId) return;
 		try {
-			await sendMessage({ threadId, prompt: text, guestSessionId: guestId });
+			await sendMessage({
+				threadId,
+				prompt: text,
+				guestToken: isAuthenticated ? undefined : await guestToken(),
+			});
 		} catch (error) {
 			const code =
 				error instanceof ConvexError
 					? ((error.data as { code?: string }).code ?? "")
 					: "";
-			if (code === "GUEST_LIMIT") {
+			if (code === "GUEST_LIMIT" || code === "NETWORK_LIMIT") {
 				setGateCode(code);
 			} else if (code === "DAILY_LIMIT") {
 				print(
@@ -321,7 +355,19 @@ export function Terminal() {
 								</div>
 							))}
 							{awaiting && <AwaitingReply />}
-							{gated && <SessionGate />}
+							{linkFailed && (
+								<LocalOutput
+									line={{
+										id: -1,
+										after: 0,
+										kind: "error",
+										text: "Could not open a guest link. Reload the page to try again, or sign in.",
+									}}
+								/>
+							)}
+							{gated && (
+								<SessionGate reason={gateCode === "NETWORK_LIMIT" ? "network" : "session"} />
+							)}
 						</>
 					)}
 				</div>
@@ -432,7 +478,7 @@ function LocalOutput({ line }: { line: LocalLine }) {
 }
 
 /** The end of a guest session: in character, with the way forward. */
-function SessionGate() {
+function SessionGate({ reason }: { reason: "session" | "network" }) {
 	return (
 		<section
 			aria-label="Guest session ended"
@@ -442,9 +488,11 @@ function SessionGate() {
 				guest link closed
 			</p>
 			<p className="mt-3 max-w-[52ch] text-sm leading-relaxed text-ice">
-				That was the last of this session&apos;s ten transmissions. Sign in to
-				open a persistent channel: a deeper model, thirty messages a day, and a
-				conversation that is still here when you come back.
+				{reason === "network"
+					? "Guest links from this network have used today\u2019s transmissions."
+					: "That was the last of this session\u2019s ten transmissions."}{" "}
+				Sign in to open a persistent channel: a deeper model, thirty messages a
+				day, and a conversation that is still here when you come back.
 			</p>
 			<div className="mt-5 flex flex-wrap items-center gap-4">
 				{/* Route handlers that redirect to WorkOS, not pages. */}

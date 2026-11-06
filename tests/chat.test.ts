@@ -2,7 +2,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../convex/_generated/api";
 import { MODELS } from "../convex/chat/agent";
 import { buildSystemPrompt, slashCommandInstruction, tierInstruction } from "../convex/_lib/persona";
-import { asUser, GUEST_A, GUEST_B, scheduled, setup } from "./setup";
+import {
+	ACCESS_TTL_MS,
+	hashNetwork,
+	networkPrefix,
+	readGuestCookie,
+	signGuestAccess,
+	signGuestCookie,
+} from "../convex/_lib/guestToken";
+import { asUser, GUEST_A, GUEST_B, scheduled, setup, TEST_SECRET, tok } from "./setup";
 
 beforeEach(() => {
 	// Freeze time so scheduled replies never run (no gateway calls) and the
@@ -32,11 +40,11 @@ describe("tier and model routing", () => {
 
 	test("an anonymous caller is routed as a guest", async () => {
 		const t = setup();
-		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		const res = await t.mutation(api.chat.mutations.sendMessage, {
 			threadId,
 			prompt: "hello",
-			guestSessionId: GUEST_A,
+			guestToken: await tok(GUEST_A),
 		});
 		expect(res).toMatchObject({ tier: "guest", used: 1, limit: 10 });
 		const jobs = await scheduled(t);
@@ -47,11 +55,11 @@ describe("tier and model routing", () => {
 	test("an authenticated caller is routed as registered, even if it sends a guest id", async () => {
 		const t = setup();
 		const user = await asUser(t, "user_reg");
-		const { threadId } = await user.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const { threadId } = await user.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		const res = await user.mutation(api.chat.mutations.sendMessage, {
 			threadId,
 			prompt: "hello",
-			guestSessionId: GUEST_A,
+			guestToken: await tok(GUEST_A),
 		});
 		expect(res).toMatchObject({ tier: "registered", limit: 30 });
 		const jobs = await scheduled(t);
@@ -60,67 +68,151 @@ describe("tier and model routing", () => {
 
 	test("clients cannot pass a tier or model", async () => {
 		const t = setup();
-		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		await expect(
 			t.mutation(api.chat.mutations.sendMessage, {
 				threadId,
 				prompt: "hi",
-				guestSessionId: GUEST_A,
+				guestToken: await tok(GUEST_A),
 				// @ts-expect-error not part of the API
 				tier: "registered",
 			}),
 		).rejects.toThrow(/extra field|Validator/i);
 	});
 
-	test("a guest needs a well-formed session id", async () => {
+	test("a guest needs a token the server signed", async () => {
 		const t = setup();
-		expect(await codeOf(t.mutation(api.chat.mutations.startThread, {}))).toBe("NO_SESSION");
+		const start = (guestToken?: string) =>
+			codeOf(t.mutation(api.chat.mutations.startThread, { guestToken }));
+		expect(await start()).toBe("NO_SESSION");
+		expect(await start("not-a-token")).toBe("NO_SESSION");
+		// Signed with another secret.
+		const forged = await signGuestAccess("x".repeat(40), GUEST_A, "net-a", Date.now());
+		expect(await start(forged.token)).toBe("NO_SESSION");
+		// A valid token with its payload swapped for another guest's.
+		const [, mac] = (await tok(GUEST_A)).split(".");
+		const [body] = (await tok(GUEST_B)).split(".");
+		expect(await start(`${body}.${mac}`)).toBe("NO_SESSION");
+		// The long-lived cookie token is not an access token.
+		expect(await start(await signGuestCookie(TEST_SECRET, GUEST_A, Date.now()))).toBe("NO_SESSION");
+		expect(await start(await tok(GUEST_A))).toBe("OK");
+	});
+
+	test("an expired token can still read its thread, but cannot write", async () => {
+		const t = setup();
+		const token = await tok(GUEST_A);
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: token });
+		vi.advanceTimersByTime(ACCESS_TTL_MS + 1000);
+		const page = { numItems: 10, cursor: null };
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.startThread, { guestSessionId: "not-a-uuid" })),
+			await codeOf(t.query(api.chat.queries.listThreadMessages, { threadId, guestToken: token, paginationOpts: page })),
+		).toBe("OK");
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: token })),
 		).toBe("NO_SESSION");
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(GUEST_A) })),
+		).toBe("OK");
+	});
+});
+
+describe("guest identity", () => {
+	test("the cookie token round-trips and rejects tampering or expiry", async () => {
+		const now = Date.now();
+		const cookie = await signGuestCookie(TEST_SECRET, GUEST_A, now);
+		expect(await readGuestCookie(TEST_SECRET, cookie, now)).toBe(GUEST_A);
+		expect(await readGuestCookie("y".repeat(40), cookie, now)).toBeNull();
+		expect(await readGuestCookie(TEST_SECRET, `${cookie}x`, now)).toBeNull();
+		expect(await readGuestCookie(TEST_SECRET, cookie, now + 31 * 24 * 3600 * 1000)).toBeNull();
+	});
+
+	test("addresses group by network: IPv4 /24, IPv6 /64", async () => {
+		expect(networkPrefix("203.0.113.7")).toBe("203.0.113.0/24");
+		expect(networkPrefix(" 203.0.113.200 ")).toBe("203.0.113.0/24");
+		expect(networkPrefix("::ffff:203.0.113.9")).toBe("203.0.113.0/24");
+		expect(networkPrefix("2001:db8:85a3:12::1")).toBe("2001:db8:85a3:12::/64");
+		expect(networkPrefix("2001:0db8:85a3:0012:aaaa::9")).toBe("2001:db8:85a3:12::/64");
+		expect(networkPrefix("2001:db8::1")).toBe("2001:db8:0:0::/64");
+		expect(await hashNetwork(TEST_SECRET, "203.0.113.0/24")).toBe(
+			await hashNetwork(TEST_SECRET, networkPrefix("203.0.113.99")),
+		);
+		expect(await hashNetwork(TEST_SECRET, "203.0.113.0/24")).not.toBe(
+			await hashNetwork(TEST_SECRET, "203.0.114.0/24"),
+		);
+	});
+
+	test("a new guest id on the same network shares the network's daily cap", async () => {
+		const t = setup();
+		// Three guests on one network (a visitor clearing cookies twice) use 30.
+		const ids = [GUEST_A, GUEST_B, "cccccccc-3333-4333-8333-cccccccccccc"];
+		for (const id of ids) {
+			const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(id, "shared") });
+			for (let i = 0; i < 10; i++) {
+				await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(id, "shared") });
+			}
+		}
+		const fresh = "dddddddd-4444-4444-8444-dddddddddddd";
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(fresh, "shared") });
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(fresh, "shared") })),
+		).toBe("NETWORK_LIMIT");
+		// The rejected message did not spend the new guest's own allowance.
+		const status = await t.query(api.chat.queries.session, { guestToken: await tok(fresh, "shared") });
+		expect(status?.used).toBe(0);
+		// The same guest id on another network is not affected.
+		const elsewhere = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(fresh, "other") });
+		expect(
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, {
+					threadId: elsewhere.threadId,
+					prompt: "x",
+					guestToken: await tok(fresh, "other"),
+				}),
+			),
+		).toBe("OK");
 	});
 });
 
 describe("message limits", () => {
 	test("guests get 10 messages per session, then GUEST_LIMIT", async () => {
 		const t = setup();
-		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		for (let i = 1; i <= 10; i++) {
 			const res = await t.mutation(api.chat.mutations.sendMessage, {
 				threadId,
 				prompt: `m${i}`,
-				guestSessionId: GUEST_A,
+				guestToken: await tok(GUEST_A),
 			});
 			expect(res.used).toBe(i);
 		}
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "m11", guestSessionId: GUEST_A }),
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "m11", guestToken: await tok(GUEST_A) }),
 			),
 		).toBe("GUEST_LIMIT");
-		const status = await t.query(api.chat.queries.session, { guestSessionId: GUEST_A });
+		const status = await t.query(api.chat.queries.session, { guestToken: await tok(GUEST_A) });
 		expect(status).toMatchObject({ tier: "guest", used: 10, remaining: 0 });
 
 		// Another guest session is unaffected; a fresh thread does not reset the cap.
-		const other = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_B });
+		const other = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_B) });
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId: other.threadId, prompt: "x", guestSessionId: GUEST_B }),
+				t.mutation(api.chat.mutations.sendMessage, { threadId: other.threadId, prompt: "x", guestToken: await tok(GUEST_B) }),
 			),
 		).toBe("OK");
-		const again = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const again = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId: again.threadId, prompt: "x", guestSessionId: GUEST_A }),
+				t.mutation(api.chat.mutations.sendMessage, { threadId: again.threadId, prompt: "x", guestToken: await tok(GUEST_A) }),
 			),
 		).toBe("GUEST_LIMIT");
 	});
 
 	test("the 7th guest message carries the in-character notice; the 10th closes the session", async () => {
 		const t = setup();
-		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		for (let i = 1; i <= 10; i++) {
-			await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: `m${i}`, guestSessionId: GUEST_A });
+			await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: `m${i}`, guestToken: await tok(GUEST_A) });
 		}
 		const jobs = (await scheduled(t)).filter((j) => j.name.includes("generateResponse"));
 		const usedSeq = jobs.map((j) => (j.args[0] as { used: number }).used);
@@ -147,13 +239,13 @@ describe("message limits", () => {
 
 	test("a rejected guest message does not consume the session's allowance", async () => {
 		const t = setup();
-		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x".repeat(2001), guestSessionId: GUEST_A }),
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x".repeat(2001), guestToken: await tok(GUEST_A) }),
 			),
 		).toBe("TOO_LONG");
-		const status = await t.query(api.chat.queries.session, { guestSessionId: GUEST_A });
+		const status = await t.query(api.chat.queries.session, { guestToken: await tok(GUEST_A) });
 		expect(status?.used).toBe(0);
 	});
 });
@@ -161,25 +253,25 @@ describe("message limits", () => {
 describe("thread ownership", () => {
 	test("another guest session cannot read or write a guest thread", async () => {
 		const t = setup();
-		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
-		await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "secret", guestSessionId: GUEST_A });
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "secret", guestToken: await tok(GUEST_A) });
 
 		const page = { numItems: 10, cursor: null };
 		const own = await t.query(api.chat.queries.listThreadMessages, {
 			threadId,
-			guestSessionId: GUEST_A,
+			guestToken: await tok(GUEST_A),
 			paginationOpts: page,
 		});
 		expect(own.page.map((m) => m.text)).toContain("secret");
 
 		expect(
 			await codeOf(
-				t.query(api.chat.queries.listThreadMessages, { threadId, guestSessionId: GUEST_B, paginationOpts: page }),
+				t.query(api.chat.queries.listThreadMessages, { threadId, guestToken: await tok(GUEST_B), paginationOpts: page }),
 			),
 		).toBe("FORBIDDEN");
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hijack", guestSessionId: GUEST_B }),
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hijack", guestToken: await tok(GUEST_B) }),
 			),
 		).toBe("FORBIDDEN");
 	});
@@ -198,7 +290,7 @@ describe("thread ownership", () => {
 		);
 		expect(
 			await codeOf(
-				t.query(api.chat.queries.listThreadMessages, { threadId, guestSessionId: GUEST_A, paginationOpts: page }),
+				t.query(api.chat.queries.listThreadMessages, { threadId, guestToken: await tok(GUEST_A), paginationOpts: page }),
 			),
 		).toBe("FORBIDDEN");
 		expect(await codeOf(bob.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x" }))).toBe("FORBIDDEN");
@@ -211,7 +303,7 @@ describe("thread ownership", () => {
 			await codeOf(
 				t.query(api.chat.queries.listThreadMessages, {
 					threadId: "nonsense",
-					guestSessionId: GUEST_A,
+					guestToken: await tok(GUEST_A),
 					paginationOpts: page,
 				}),
 			),
@@ -228,10 +320,10 @@ describe("thread ownership", () => {
 
 	test("a guest can resume only its own thread", async () => {
 		const t = setup();
-		const a = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A });
-		const resumed = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_A, resume: a.threadId });
+		const a = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		const resumed = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A), resume: a.threadId });
 		expect(resumed.threadId).toBe(a.threadId);
-		const stolen = await t.mutation(api.chat.mutations.startThread, { guestSessionId: GUEST_B, resume: a.threadId });
+		const stolen = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_B), resume: a.threadId });
 		expect(stolen.threadId).not.toBe(a.threadId);
 	});
 });

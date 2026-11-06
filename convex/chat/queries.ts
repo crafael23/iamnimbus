@@ -18,12 +18,12 @@ import {
 export const listThreadMessages = query({
 	args: {
 		threadId: v.string(),
-		guestSessionId: v.optional(v.string()),
+		guestToken: v.optional(v.string()),
 		paginationOpts: paginationOptsValidator,
 		streamArgs: vStreamArgs,
 	},
-	handler: async (ctx, { threadId, guestSessionId, paginationOpts, streamArgs }) => {
-		const owner = await resolveChatOwner(ctx, guestSessionId);
+	handler: async (ctx, { threadId, guestToken, paginationOpts, streamArgs }) => {
+		const owner = await resolveChatOwner(ctx, guestToken, "read");
 		await authorizeThreadAccess(ctx, threadId, owner);
 		const streams = await syncStreams(ctx, components.agent, {
 			threadId,
@@ -39,11 +39,11 @@ export const listThreadMessages = query({
 
 /** Tier and quota for the current visitor, computed on the server. */
 export const session = query({
-	args: { guestSessionId: v.optional(v.string()) },
-	handler: async (ctx, { guestSessionId }) => {
+	args: { guestToken: v.optional(v.string()) },
+	handler: async (ctx, { guestToken }) => {
 		const identity = await ctx.auth.getUserIdentity();
-		if (!identity && !guestSessionId) return null;
-		const owner = await resolveChatOwner(ctx, guestSessionId);
+		if (!identity && !guestToken) return null;
+		const owner = await resolveChatOwner(ctx, guestToken, "read");
 		const limit = limitFor(owner.tier);
 		const remaining = await remainingMessages(ctx, owner);
 		return {

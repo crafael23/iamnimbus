@@ -19,11 +19,11 @@ const MAX_PROMPT_LENGTH = 2000;
  */
 export const startThread = mutation({
 	args: {
-		guestSessionId: v.optional(v.string()),
+		guestToken: v.optional(v.string()),
 		resume: v.optional(v.string()),
 	},
-	handler: async (ctx, { guestSessionId, resume }) => {
-		const owner = await resolveChatOwner(ctx, guestSessionId);
+	handler: async (ctx, { guestToken, resume }) => {
+		const owner = await resolveChatOwner(ctx, guestToken, "write");
 		if (owner.tier === "registered") {
 			const existing = await latestThreadId(ctx, owner.ownerId);
 			if (existing) return { threadId: existing };
@@ -39,6 +39,13 @@ export const startThread = mutation({
 			key: owner.ownerId,
 		});
 		if (!status.ok) throw new ConvexError({ code: "RATE_LIMITED" });
+		if (owner.network) {
+			// Throwing rolls back the per-owner token taken above.
+			const net = await rateLimiter.limit(ctx, "guestNetworkThreads", {
+				key: owner.network,
+			});
+			if (!net.ok) throw new ConvexError({ code: "RATE_LIMITED" });
+		}
 		const threadId = await createThread(ctx, components.agent, {
 			userId: owner.ownerId,
 		});
@@ -54,15 +61,15 @@ export const sendMessage = mutation({
 	args: {
 		threadId: v.string(),
 		prompt: v.string(),
-		guestSessionId: v.optional(v.string()),
+		guestToken: v.optional(v.string()),
 	},
-	handler: async (ctx, { threadId, prompt, guestSessionId }) => {
+	handler: async (ctx, { threadId, prompt, guestToken }) => {
 		const text = prompt.trim();
 		if (!text) throw new ConvexError({ code: "EMPTY" });
 		if (text.length > MAX_PROMPT_LENGTH) {
 			throw new ConvexError({ code: "TOO_LONG", max: MAX_PROMPT_LENGTH });
 		}
-		const owner = await resolveChatOwner(ctx, guestSessionId);
+		const owner = await resolveChatOwner(ctx, guestToken, "write");
 		await authorizeThreadAccess(ctx, threadId, owner);
 
 		const limitName =
@@ -76,8 +83,18 @@ export const sendMessage = mutation({
 				retryAfter: status.retryAfter,
 			});
 		}
-		if (owner.tier === "guest") {
-			// Throwing rolls back the per-session token taken above.
+		if (owner.network) {
+			// Throwing rolls back every token taken above, so a rejected
+			// message never spends the guest's own allowance.
+			const net = await rateLimiter.limit(ctx, "guestNetworkMessages", {
+				key: owner.network,
+			});
+			if (!net.ok) {
+				throw new ConvexError({
+					code: "NETWORK_LIMIT",
+					retryAfter: net.retryAfter,
+				});
+			}
 			const global = await rateLimiter.limit(ctx, "guestGlobal");
 			if (!global.ok) {
 				throw new ConvexError({

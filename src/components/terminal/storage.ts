@@ -1,6 +1,5 @@
 /** Browser storage helpers. Every access is guarded: storage can throw. */
 
-const GUEST_KEY = "grid.guestSession";
 const BOOT_KEY = "grid.booted";
 const THREAD_KEY = "grid.guestThread";
 const CLEAR_KEY = "grid.clearedAt:";
@@ -21,20 +20,8 @@ function write(store: Storage | undefined, key: string, value: string) {
 	}
 }
 
-const local = () => (typeof window === "undefined" ? undefined : window.localStorage);
 const session = () =>
 	typeof window === "undefined" ? undefined : window.sessionStorage;
-
-let memoryGuestId: string | null = null;
-
-/** Random guest session id, stable per browser. The server keys limits on it. */
-export function guestSessionId(): string {
-	const stored = read(local(), GUEST_KEY);
-	if (stored) return stored;
-	memoryGuestId ??= crypto.randomUUID();
-	write(local(), GUEST_KEY, memoryGuestId);
-	return memoryGuestId;
-}
 
 export const hasBooted = () => read(session(), BOOT_KEY) === "1";
 export const markBooted = () => write(session(), BOOT_KEY, "1");
