@@ -11,6 +11,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useLayoutEffect,
 	useRef,
 	useState,
 	type KeyboardEvent,
@@ -182,6 +183,20 @@ export function Terminal() {
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const suggestions = matchCommands(input);
 	const showSuggestions = suggestions.length > 0 && input !== suggestions[0]?.name;
+
+	// The list floats above the box, unless the box sits too close to the top
+	// of the screen (a short or cleared conversation): then it opens below.
+	const dock = useRef<HTMLDivElement>(null);
+	const list = useRef<HTMLUListElement>(null);
+	const [listBelow, setListBelow] = useState(false);
+	useLayoutEffect(() => {
+		const box = dock.current;
+		const view = scroller.current;
+		const menu = list.current;
+		if (!showSuggestions || !box || !view || !menu) return;
+		const room = box.getBoundingClientRect().top - view.getBoundingClientRect().top;
+		setListBelow(room < menu.offsetHeight + 12);
+	}, [showSuggestions, suggestions.length]);
 
 	useEffect(() => {
 		if (bootDone) inputRef.current?.focus({ preventScroll: true });
@@ -383,13 +398,16 @@ export function Terminal() {
 				</div>
 				{bootDone && !gated && (
 					<div className="sticky bottom-0 z-10 mt-8 w-full bg-gradient-to-t from-void from-70% to-transparent px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-6 sm:px-10 sm:pb-10">
-						<div className="relative mx-auto max-w-[860px]">
-							{/* Floats above the box so opening it never moves the input. */}
+						<div ref={dock} className="relative mx-auto max-w-[860px]">
+							{/* Floats over the text so opening it never moves the input. */}
 							{showSuggestions && (
 								<ul
+									ref={list}
 									id="command-list"
 									aria-label="Commands"
-									className="crt-text absolute inset-x-0 bottom-full mb-2 border border-line bg-void/95 py-1 text-[19px] sm:text-[20px]"
+									className={`crt-text absolute inset-x-0 z-20 border border-line bg-void/95 py-1 text-[19px] sm:text-[20px] ${
+										listBelow ? "top-full mt-2" : "bottom-full mb-2"
+									}`}
 								>
 									{suggestions.map((c, i) => (
 										<li key={c.name}>
