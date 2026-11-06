@@ -71,6 +71,16 @@ export function Terminal() {
 	/** Set while a message waits on a guest token, before `replying` can see it. */
 	const sending = useRef(false);
 
+	const conversionSent = useRef(false);
+	const convertGuest = useMutation(api.analytics.mutations.convertGuest);
+	useEffect(() => {
+		if (!isAuthenticated || conversionSent.current) return;
+		conversionSent.current = true;
+		void guestToken()
+			.then((token) => convertGuest({ guestToken: token }))
+			.catch(() => {});
+	}, [isAuthenticated, convertGuest]);
+
 	const startThread = useMutation(api.chat.mutations.startThread);
 	const sendMessage = useMutation(
 		api.chat.mutations.sendMessage,

@@ -1,5 +1,6 @@
 import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { experimental_decide as decide } from "ai";
+import { topics } from "./analytics";
 
 /**
  * Prompt-injection gates, judged by TypeSafe's Jev through the Convex AI
@@ -42,6 +43,7 @@ export type Verdict = {
 	/** US dollars, as reported by the gateway (0 when not reported). */
 	cost: number;
 	error?: string;
+	topic?: (typeof topics)[number];
 };
 
 export async function checkContent(gate: Gate, state: Record<string, string>): Promise<Verdict> {
@@ -50,13 +52,29 @@ export async function checkContent(gate: Gate, state: Record<string, string>): P
 		const result = await decide({
 			model: judge,
 			state,
-			questions: { attack: { type: "boolean", instructions } },
+			questions: {
+				attack: { type: "boolean", instructions },
+				// Visitor messages also get a topic, for analytics, from the same call.
+				...(gate === "visitor"
+					? {
+							topic: {
+								type: "choice" as const,
+								instructions: "Choose the primary topic of the visitor message.",
+								criteria: Object.fromEntries(topics.map((topic) => [topic, topic])),
+							},
+						}
+					: {}),
+			},
 			maxRetries: 1,
 		});
 		const answer = result.answers.attack;
 		const probability = answer.type === "boolean" ? answer.probability : 1;
+		const topicAnswer = result.answers.topic;
+		const topic =
+			topicAnswer?.type === "choice" ? topics.find((t) => t === topicAnswer.choice) : undefined;
 		const meta = result.providerMetadata?.convexGateway as { cost?: number } | undefined;
 		return {
+			...(topic ? { topic } : {}),
 			flagged: probability >= threshold,
 			probability,
 			cost: typeof meta?.cost === "number" ? meta.cost : 0,

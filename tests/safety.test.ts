@@ -7,7 +7,7 @@ import { asUser, GUEST_A, scheduled, setup, type T, tok } from "./setup";
 // The Jev judge is a network call; each test decides what it answers
 // ("throw" simulates an unexpected crash inside the turn).
 const verdicts: Partial<Record<Gate, Verdict | "throw">> = {};
-const pass: Verdict = { flagged: false, probability: 0.02, cost: 0.00002 };
+const pass: Verdict = { topic: "projects", flagged: false, probability: 0.02, cost: 0.00002 };
 vi.mock("../convex/_lib/safety", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../convex/_lib/safety")>();
 	return {
@@ -406,3 +406,14 @@ describe("WorkOS membership events", () => {
 		expect(await roleOf(t)).toBe("admin");
 	});
 });
+
+ test("topics are recorded only after the visitor gate passes", async () => {
+ const t = setup();
+ verdicts.visitor = { flagged: true, probability: 1, cost: 0, topic: "skills" };
+ await guestTurn(t, "blocked");
+ expect(await t.run(ctx => ctx.db.query("analyticsEvents").collect())).not.toEqual(expect.arrayContaining([expect.objectContaining({ kind: "topic" })]));
+ verdicts.visitor = pass;
+ await guestTurn(t, "projects?");
+ const events = await t.run(ctx => ctx.db.query("analyticsEvents").collect());
+ expect(events.filter(e => e.kind === "topic")).toMatchObject([{ topic: "projects" }]);
+ });

@@ -67,6 +67,7 @@ const project = {
  * if a new adminQuery/adminMutation/adminAction is added without a row here.
  */
 const ADMIN_CALLS = {
+ "analytics.queries.summary": (c: Caller) => c.query(api.analytics.queries.summary, { days: 7 }),
 	"knowledge.queries.list": (c: Caller) => c.query(api.knowledge.queries.list, {}),
 	"knowledge.queries.get": (c: Caller, f: Fixture) => c.query(api.knowledge.queries.get, { docId: f.docId }),
 	"knowledge.queries.statusForSource": (c: Caller, f: Fixture) =>

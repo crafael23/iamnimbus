@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { eventFields } from "./_lib/analytics";
 import { vNamespace } from "./_lib/namespaces";
 
 export const vKnowledgeSource = v.union(
@@ -16,7 +17,9 @@ export const vIngestStatus = v.union(
 );
 
 export default defineSchema({
+	analyticsEvents: defineTable(eventFields).index("by_day_kind", ["day", "kind"]),
 	users: defineTable({
+		guestConvertedAt: v.optional(v.number()),
 		authId: v.optional(v.string()), // WorkOS user id, from webhook event.data.id
 		tokenIdentifier: v.string(), // Convex auth lookup, same as authId for WorkOS
 		name: v.string(),

@@ -2,6 +2,7 @@ import { createThread, saveMessage } from "@convex-dev/agent";
 import { ConvexError, v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { mutation } from "../_generated/server";
+import { recordEvent } from "../_lib/analytics";
 import { reserveTurn } from "../_lib/billing";
 import { GUEST_NOTICE_AT, rateLimiter } from "../_lib/rateLimits";
 import {
@@ -53,6 +54,7 @@ export const startThread = mutation({
 		const threadId = await createThread(ctx, components.agent, {
 			userId: owner.ownerId,
 		});
+		await recordEvent(ctx, { kind: "session", tier: owner.tier });
 		return { threadId };
 	},
 });
@@ -155,6 +157,10 @@ export const sendMessage = mutation({
 			prompt: text,
 			reservationId,
 		});
+		await recordEvent(ctx, { kind: "message", tier: owner.tier });
+		if (owner.tier === "guest" && remaining === 0) {
+			await recordEvent(ctx, { kind: "limit", tier: "guest" });
+		}
 		return { tier: owner.tier, used, limit, remaining };
 	},
 });

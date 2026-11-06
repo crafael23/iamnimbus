@@ -4,6 +4,7 @@ import { useConvexAuth, useQuery } from "convex/react";
 import { useState } from "react";
 import { SiteNav } from "@/components/SiteNav";
 import { api } from "../../../convex/_generated/api";
+import { AnalyticsPanel } from "./AnalyticsPanel";
 import { BlogPanel } from "./BlogPanel";
 import { GithubPanel } from "./GithubPanel";
 import { KnowledgePanel, SkeletonRows } from "./KnowledgePanel";
@@ -11,6 +12,7 @@ import { ProjectsPanel } from "./ProjectsPanel";
 import { PromptPanel } from "./PromptPanel";
 
 const SECTIONS = [
+ { id: "analytics", label: "Analytics" },
 	{ id: "knowledge", label: "Knowledge" },
 	{ id: "blog", label: "Blog" },
 	{ id: "projects", label: "Projects" },
@@ -78,6 +80,7 @@ export function AdminApp() {
 							{section === "projects" && <ProjectsPanel />}
 							{section === "prompt" && <PromptPanel />}
 							{section === "github" && <GithubPanel />}
+ {section === "analytics" && <AnalyticsPanel />}
 						</main>
 					</>
 				)}

@@ -94,6 +94,9 @@ export const generateResponse = internalAction({
 				return null;
 			}
 			turn.approved = true;
+			if (inbound.topic) {
+				await ctx.runMutation(internal.analytics.internal.recordTopic, { topic: inbound.topic });
+			}
 
 			const persona = await ctx.runQuery(internal.prompts.queries.activeContent, {});
 			const system = buildSystemPrompt({ ...args, persona });

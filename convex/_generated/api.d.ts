@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as _lib_analytics from "../_lib/analytics.js";
 import type * as _lib_auth from "../_lib/auth.js";
 import type * as _lib_billing from "../_lib/billing.js";
 import type * as _lib_customFunctions from "../_lib/customFunctions.js";
@@ -21,6 +22,9 @@ import type * as _lib_rag from "../_lib/rag.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
 import type * as _lib_safety from "../_lib/safety.js";
 import type * as _lib_slug from "../_lib/slug.js";
+import type * as analytics_internal from "../analytics/internal.js";
+import type * as analytics_mutations from "../analytics/mutations.js";
+import type * as analytics_queries from "../analytics/queries.js";
 import type * as auth from "../auth.js";
 import type * as authInternal from "../authInternal.js";
 import type * as billing_internal from "../billing/internal.js";
@@ -31,6 +35,7 @@ import type * as chat_agent from "../chat/agent.js";
 import type * as chat_mutations from "../chat/mutations.js";
 import type * as chat_queries from "../chat/queries.js";
 import type * as chat_threads from "../chat/threads.js";
+import type * as crons from "../crons.js";
 import type * as github_actions from "../github/actions.js";
 import type * as github_mutations from "../github/mutations.js";
 import type * as github_queries from "../github/queries.js";
@@ -53,6 +58,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "_lib/analytics": typeof _lib_analytics;
   "_lib/auth": typeof _lib_auth;
   "_lib/billing": typeof _lib_billing;
   "_lib/customFunctions": typeof _lib_customFunctions;
@@ -66,6 +72,9 @@ declare const fullApi: ApiFromModules<{
   "_lib/rateLimits": typeof _lib_rateLimits;
   "_lib/safety": typeof _lib_safety;
   "_lib/slug": typeof _lib_slug;
+  "analytics/internal": typeof analytics_internal;
+  "analytics/mutations": typeof analytics_mutations;
+  "analytics/queries": typeof analytics_queries;
   auth: typeof auth;
   authInternal: typeof authInternal;
   "billing/internal": typeof billing_internal;
@@ -76,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   "chat/mutations": typeof chat_mutations;
   "chat/queries": typeof chat_queries;
   "chat/threads": typeof chat_threads;
+  crons: typeof crons;
   "github/actions": typeof github_actions;
   "github/mutations": typeof github_mutations;
   "github/queries": typeof github_queries;
