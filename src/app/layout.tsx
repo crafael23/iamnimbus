@@ -46,9 +46,8 @@ export default function RootLayout({
 		<html lang="en" className={`${display.variable} ${crt.variable} ${mono.variable}`}>
 			<body>
 				<ConvexClientProvider>
-					<div className="crt-content">{children}</div>
+					<CrtScreen>{children}</CrtScreen>
 				</ConvexClientProvider>
-				<CrtScreen />
 			</body>
 		</html>
 	);

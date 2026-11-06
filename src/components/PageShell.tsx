@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
 import { SiteNav } from "./SiteNav";
 
-/** Long-form surfaces: the same tube, a calmer screen, a readable column. */
+/** Long-form surfaces: the same tube, a readable column. */
 export function PageShell({ children }: { children: ReactNode }) {
 	return (
-		<div className="relative min-h-[100dvh] bg-void">
-			<div aria-hidden className="crt-glass" />
+		<div className="relative min-h-full">
 			<SiteNav />
 			<main className="screen-in crt-text relative z-10 mx-auto max-w-[1100px] px-5 pb-28 pt-12 sm:px-8 sm:pt-20">
 				{children}

@@ -285,7 +285,6 @@ export function Terminal() {
 	const bootLines: BootLine[] = [
 		{ label: "phosphor", value: "warm" },
 		{ label: "archive", value: "6 sectors indexed" },
-		{ label: "persona", value: "loaded" },
 		{
 			label: "link",
 			value:
@@ -317,7 +316,7 @@ export function Terminal() {
 
 	return (
 		<div
-			className={`relative flex h-[100dvh] flex-col overflow-hidden bg-void font-crt ${
+			className={`relative flex h-full flex-col overflow-hidden font-crt ${
 				degauss ? "degauss" : ""
 			}`}
 			onAnimationEnd={(e) => {
@@ -325,9 +324,6 @@ export function Terminal() {
 			}}
 		>
 			<div aria-hidden className={`crt-glass ${replying ? "is-live" : ""}`} />
-			<div aria-hidden className="crt-burn">
-				nimbus
-			</div>
 
 			<SiteNav status={status} />
 
@@ -341,7 +337,7 @@ export function Terminal() {
 					role="log"
 					aria-live="polite"
 					aria-relevant="additions"
-					className="crt-text mx-auto max-w-[900px] px-5 pb-10 sm:px-8"
+					className="crt-text mx-auto max-w-[860px] px-5 pb-10 sm:px-10"
 				>
 					{cleared === 0 && (
 						<BootSequence lines={bootLines} instant={booted} onDone={finishBoot} />
@@ -386,13 +382,13 @@ export function Terminal() {
 			</div>
 
 			{bootDone && !gated && (
-				<div className="relative z-10 shrink-0 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 sm:px-6 sm:pb-6">
-					<div className="mx-auto max-w-[900px]">
+				<div className="relative z-10 shrink-0 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-2 sm:px-10 sm:pb-8">
+					<div className="mx-auto max-w-[860px]">
 						{showSuggestions && (
 							<ul
 								id="command-list"
 								aria-label="Commands"
-								className="crt-text mb-2 border border-line-strong bg-deep/95 py-1 text-[19px] sm:text-[20px]"
+								className="crt-text mb-3 text-[19px] sm:text-[20px]"
 							>
 								{suggestions.map((c, i) => (
 									<li key={c.name}>
@@ -404,7 +400,7 @@ export function Terminal() {
 												e.preventDefault();
 												void submit(c.name);
 											}}
-											className={`flex w-full gap-4 px-3 py-0.5 text-left ${
+											className={`flex w-full gap-4 px-2 py-0.5 text-left ${
 												i === selected ? "reverse" : "text-fog"
 											}`}
 										>
@@ -425,10 +421,10 @@ export function Terminal() {
 								e.preventDefault();
 								if (!replying) void submit(input);
 							}}
-							className="glow-edge crt-text flex items-start gap-[1ch] bg-deep/85 px-3 py-2.5 sm:px-4"
+							className="crt-text flex items-start gap-[1ch] pt-3"
 						>
-							<label htmlFor="prompt" className="shrink-0 select-none pt-[1px] text-cyan glow-text">
-								{"❯"}
+							<label htmlFor="prompt" className="shrink-0 select-none text-[20px] leading-[1.3] glow-text sm:text-[22px]">
+								{">"}
 								<span className="sr-only">Message</span>
 							</label>
 							<textarea
@@ -457,9 +453,9 @@ export function Terminal() {
 							<button
 								type="submit"
 								disabled={replying || !threadId || !input.trim()}
-								className="shrink-0 text-[18px] uppercase tracking-[0.12em] text-cyan transition-opacity hover:text-ice disabled:opacity-30 sm:text-[20px]"
+								className="shrink-0 text-[17px] uppercase tracking-[0.14em] text-dim transition-colors hover:text-cyan enabled:text-cyan-dim disabled:opacity-0 sm:text-[19px]"
 							>
-								[send]
+								send
 							</button>
 						</form>
 					</div>
@@ -496,34 +492,28 @@ function SessionGate({ reason }: { reason: "session" | "network" }) {
 	return (
 		<section
 			aria-label="Guest session ended"
-			className="line-in mt-10 border border-amber/70 bg-deep/80 shadow-[0_0_32px_-6px_rgba(255,180,84,0.45),inset_0_0_28px_-10px_rgba(255,180,84,0.35)]"
+			className="line-in mt-12 border-l-2 border-amber pl-5 text-[19px] leading-snug sm:text-[21px]"
 		>
-			<p className="reverse-amber flex items-center justify-between px-4 py-1 text-[18px] uppercase tracking-[0.14em] sm:px-6 sm:text-[20px]">
-				<span>link terminated</span>
-				<span aria-hidden className="cursor-blink">{"\u25A0"}</span>
+			<p className="glow-amber uppercase tracking-[0.14em]">
+				link terminated <span aria-hidden className="cursor-blink">{"\u25A0"}</span>
 			</p>
-			<div className="p-5 sm:p-6">
-				<p className="glow-amber max-w-[52ch] text-[19px] leading-snug sm:text-[21px]">
-					{reason === "network"
-						? "Guest links from this network have used today\u2019s transmissions."
-						: "That was the last of this session\u2019s ten transmissions."}{" "}
-					Sign in to open a persistent channel: a deeper model, thirty messages a
-					day, and a conversation that is still here when you come back.
-				</p>
-				<div className="mt-6 flex flex-wrap items-center gap-5 text-[19px] uppercase tracking-[0.1em] sm:text-[21px]">
-					{/* Route handlers that redirect to WorkOS, not pages. */}
-					{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
-					<a
-						href="/sign-in"
-						className="border border-amber px-4 py-1 text-amber shadow-[0_0_18px_-4px_rgba(255,180,84,0.6)] transition-colors hover:bg-amber hover:text-void active:translate-y-px"
-					>
-						[ sign in ]
-					</a>
-					{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
-					<a href="/sign-up" className="text-fog hover:text-ice">
-						create an account
-					</a>
-				</div>
+			<p className="mt-3 max-w-[52ch] text-fog">
+				{reason === "network"
+					? "Guest links from this network have used today\u2019s transmissions."
+					: "That was the last of this session\u2019s ten transmissions."}{" "}
+				Sign in to open a persistent channel: a deeper model, thirty messages a
+				day, and a conversation that is still here when you come back.
+			</p>
+			<div className="mt-6 flex flex-wrap items-center gap-6 uppercase tracking-[0.1em]">
+				{/* Route handlers that redirect to WorkOS, not pages. */}
+				{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
+				<a href="/sign-in" className="reverse-amber px-3 active:translate-y-px">
+					sign in
+				</a>
+				{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
+				<a href="/sign-up" className="text-dim transition-colors hover:text-ice">
+					create an account
+				</a>
 			</div>
 		</section>
 	);

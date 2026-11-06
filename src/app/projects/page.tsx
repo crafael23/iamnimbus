@@ -24,24 +24,28 @@ export default async function ProjectsIndex() {
 			{projects.length === 0 ? (
 				<p className="mt-16 font-prose text-fog">No projects are published yet.</p>
 			) : (
-				<ul className="mt-14 grid gap-4 sm:grid-cols-2">
+				<ul className="mt-14 max-w-[820px]">
 					{projects.map((p) => (
-						<li key={p._id}>
+						<li key={p._id} className="group border-t border-dashed border-line-strong first:border-t-0">
 							<Link
 								href={`/projects/${p.slug}`}
-								className="group flex h-full flex-col gap-4 border border-line-strong bg-void/80 p-6 transition-colors hover:border-cyan-dim hover:bg-deep sm:p-8"
+								className="grid gap-2 py-7 sm:grid-cols-[10rem_1fr] sm:gap-8"
 							>
-								<span className="flex items-baseline justify-between gap-4">
-									<span className="font-crt text-[26px] uppercase leading-[1.1] tracking-[0.03em] text-ice transition-colors group-hover:text-cyan">
+								<span className="pt-1 font-crt text-[17px] uppercase tracking-[0.08em] text-dim">
+									{p.year ?? ""}
+								</span>
+								<span>
+									<span className="block font-crt text-[26px] uppercase leading-[1.1] tracking-[0.03em] text-ice transition-colors group-hover:text-cyan sm:text-[30px]">
 										{p.title}
 									</span>
-									{p.year && <span className="font-crt text-[18px] text-dim">{p.year}</span>}
-								</span>
-								<span className="font-prose text-[15px] leading-relaxed text-fog">{p.summary}</span>
-								<span className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2 font-crt text-[17px] uppercase tracking-[0.06em] text-cyan-dim">
-									{p.stack.map((s) => (
-										<span key={s}>{s}</span>
-									))}
+									<span className="mt-2 block font-prose text-[15px] leading-relaxed text-fog">
+										{p.summary}
+									</span>
+									<span className="mt-3 flex flex-wrap gap-x-3 gap-y-1 font-crt text-[17px] uppercase tracking-[0.06em] text-cyan-dim">
+										{p.stack.map((s) => (
+											<span key={s}>{s}</span>
+										))}
+									</span>
 								</span>
 							</Link>
 						</li>

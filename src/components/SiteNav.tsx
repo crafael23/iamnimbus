@@ -28,21 +28,20 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 
 	const linkClass = (href: string) =>
 		isActive(href)
-			? "reverse px-1 sm:px-1.5"
-			: "px-1 text-dim transition-colors hover:text-ice sm:px-1.5";
+			? "reverse inline-block px-1 sm:px-1.5"
+			: "inline-block px-1 py-2 text-dim transition-colors hover:text-ice sm:px-1.5";
 
 	return (
-		<header className="crt-text relative z-20 border-b border-line/80 bg-void/70 font-crt">
+		<header className="crt-text relative z-20 font-crt">
 			<nav
 				aria-label="Primary"
-				className="mx-auto flex h-14 max-w-[1100px] items-center gap-2.5 px-4 text-[17px] uppercase tracking-[0.04em] sm:gap-7 sm:px-8 sm:text-[20px] sm:tracking-[0.08em]"
+				className="mx-auto flex h-16 max-w-[1100px] items-center gap-2.5 px-5 text-[17px] uppercase tracking-[0.04em] sm:gap-7 sm:px-10 sm:text-[19px] sm:tracking-[0.08em]"
 			>
 				<Link
 					href="/"
 					className="scanned whitespace-nowrap font-display text-[11px] normal-case tracking-normal text-ice sm:text-[12px]"
 				>
 					<span className="glow-text">nimbus</span>
-					<span className="hidden text-dim sm:inline">{"//"}grid</span>
 				</Link>
 				<ul className="flex items-center gap-0.5 sm:gap-4">
 					{LINKS.map((link) => (

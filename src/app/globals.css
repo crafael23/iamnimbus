@@ -148,10 +148,10 @@
 
 @keyframes roll {
 	from {
-		transform: translateY(-40vh);
+		transform: translateY(-100%);
 	}
 	to {
-		transform: translateY(140vh);
+		transform: translateY(340%);
 	}
 }
 
@@ -173,53 +173,6 @@
 	}
 	100% {
 		transform: translate(0, 0);
-	}
-}
-
-@keyframes flicker {
-	0%,
-	100% {
-		opacity: 0;
-	}
-	7% {
-		opacity: 0.05;
-	}
-	8% {
-		opacity: 0;
-	}
-	46% {
-		opacity: 0.025;
-	}
-	47% {
-		opacity: 0;
-	}
-	83% {
-		opacity: 0.06;
-	}
-	84% {
-		opacity: 0.01;
-	}
-}
-
-@keyframes glitch-jolt {
-	0% {
-		transform: none;
-		filter: none;
-	}
-	25% {
-		transform: translateX(4px) skewX(-1.5deg);
-		filter: hue-rotate(25deg) brightness(1.25);
-	}
-	50% {
-		transform: translateX(-3px);
-		filter: hue-rotate(-20deg);
-	}
-	75% {
-		transform: translateX(1px) skewX(0.6deg);
-	}
-	100% {
-		transform: none;
-		filter: none;
 	}
 }
 
@@ -294,13 +247,21 @@
 /* ------------------------------------------------------------------ */
 
 @layer base {
+	/* The page never scrolls: the screen does (see .crt-scroll). */
+	html,
+	body {
+		height: 100%;
+		overflow: hidden;
+	}
+
+	/* The bezel: dark charcoal, so the convex glass reads against it. */
 	html {
-		background: #000;
+		background: #0b0d0e;
 		color-scheme: dark;
 	}
 
 	body {
-		background: var(--color-void);
+		background: radial-gradient(ellipse 90% 80% at 50% 40%, #121516, #08090a);
 		color: var(--color-ice);
 		font-family: var(--font-mono);
 		-webkit-font-smoothing: antialiased;
@@ -323,13 +284,11 @@
 /* Phosphor text                                                       */
 /* ------------------------------------------------------------------ */
 
-/* Resting glow plus a hint of convergence error at the glyph edges. */
+/* The resting glow of lit phosphor. */
 .crt-text {
 	text-shadow:
 		0 0 1px color-mix(in oklab, currentColor 70%, transparent),
-		0 0 8px color-mix(in oklab, currentColor 32%, transparent),
-		0.6px 0 0 rgb(255 40 90 / 0.14),
-		-0.6px 0 0 rgb(40 170 255 / 0.14);
+		0 0 8px color-mix(in oklab, currentColor 30%, transparent);
 }
 
 .glow-text {
@@ -347,20 +306,6 @@
 		0 0 12px color-mix(in oklab, var(--color-amber) 45%, transparent);
 }
 
-.glow-edge {
-	border: 1px solid color-mix(in oklab, var(--color-cyan) 45%, transparent);
-	box-shadow:
-		0 0 16px -4px color-mix(in oklab, var(--color-cyan) 35%, transparent),
-		inset 0 0 22px -8px color-mix(in oklab, var(--color-cyan) 30%, transparent);
-}
-
-form.glow-edge:focus-within {
-	border-color: color-mix(in oklab, var(--color-cyan) 75%, transparent);
-	box-shadow:
-		0 0 24px -4px color-mix(in oklab, var(--color-cyan) 50%, transparent),
-		inset 0 0 26px -8px color-mix(in oklab, var(--color-cyan) 40%, transparent);
-}
-
 /* Reverse video: the CRT's only way to highlight. */
 .reverse {
 	background: var(--color-cyan);
@@ -373,21 +318,6 @@ form.glow-edge:focus-within {
 	color: var(--color-void);
 	text-shadow: none;
 	box-shadow: 0 0 16px -2px color-mix(in oklab, var(--color-amber) 60%, transparent);
-}
-
-/* A program reply hangs off a faint phosphor rule. */
-.reply-rule {
-	position: relative;
-}
-.reply-rule::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	top: 0.25em;
-	bottom: 0.25em;
-	width: 1px;
-	background: var(--color-line-strong);
-	box-shadow: 0 0 6px 0 color-mix(in oklab, var(--color-cyan) 35%, transparent);
 }
 
 .cursor-block {
@@ -414,8 +344,96 @@ form.glow-edge:focus-within {
 }
 
 /* ------------------------------------------------------------------ */
-/* The screen: glass, burn-in and the effects layer                    */
+/* The screen                                                          */
 /* ------------------------------------------------------------------ */
+
+/*
+ * One tube for every page. The screen is fixed (inset by a thin bezel on
+ * wide screens) and scrolls inside itself, so the curvature filter set by
+ * CrtScreen can bend it. The glass (.crt-overlay) is a second, unbent
+ * screen-shaped layer in front.
+ */
+.crt-screen {
+	position: fixed;
+	inset: 0;
+	overflow: hidden;
+	isolation: isolate;
+	background: var(--color-void);
+	border-radius: 20px;
+}
+@media (min-width: 768px) {
+	.crt-screen {
+		inset: 12px;
+		border-radius: 38px / 34px;
+	}
+}
+
+.crt-scroll {
+	position: absolute;
+	inset: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-line-strong) transparent;
+}
+
+.crt-overlay {
+	z-index: 50;
+	pointer-events: none;
+	background: transparent;
+}
+.crt-overlay > * {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.crt-scan {
+	background: repeating-linear-gradient(
+		to bottom,
+		transparent 0,
+		transparent 2px,
+		rgb(0 0 0 / 0.2) 2px,
+		rgb(0 0 0 / 0.2) 3px
+	);
+}
+
+/* A faint refresh band drifting down the glass. */
+.crt-roll {
+	inset: 0 0 auto 0;
+	height: 30%;
+	background: linear-gradient(
+		to bottom,
+		transparent,
+		color-mix(in oklab, var(--color-cyan) 3%, transparent) 60%,
+		transparent
+	);
+	transform: translateY(-100%);
+}
+
+/* Convex glass: dark falloff toward the edges and a soft reflection. */
+.crt-vignette {
+	background: radial-gradient(
+		ellipse 105% 100% at 50% 50%,
+		transparent 52%,
+		rgb(0 0 0 / 0.42) 80%,
+		rgb(0 0 0 / 0.88) 100%
+	);
+	box-shadow: inset 0 0 70px 14px rgb(0 0 0 / 0.7);
+}
+.crt-glare {
+	background:
+		radial-gradient(
+			ellipse 55% 38% at 30% 16%,
+			rgb(255 255 255 / 0.045),
+			transparent 70%
+		),
+		radial-gradient(
+			ellipse 120% 90% at 50% 50%,
+			color-mix(in oklab, var(--color-cyan) 5%, transparent),
+			transparent 65%
+		);
+}
 
 /* Center lift of a warm tube; breathes while a reply is arriving. */
 .crt-glass {
@@ -424,114 +442,18 @@ form.glow-edge:focus-within {
 	pointer-events: none;
 	background: radial-gradient(
 		ellipse 70% 60% at 50% 45%,
-		color-mix(in oklab, var(--color-cyan) 7%, transparent) 0%,
+		color-mix(in oklab, var(--color-cyan) 6%, transparent) 0%,
 		transparent 70%
 	);
-	opacity: 0.55;
+	opacity: 0;
 	transition: opacity 1s ease;
-}
-
-/* A ghost of the wordmark, burned into the phosphor by years of idling. */
-.crt-burn {
-	position: fixed;
-	left: 50%;
-	top: 52%;
-	transform: translate(-50%, -50%);
-	pointer-events: none;
-	user-select: none;
-	white-space: nowrap;
-	font-family: var(--font-display);
-	font-size: clamp(3rem, 15vw, 14rem);
-	font-variation-settings: "BLED" 25, "SCAN" 80;
-	color: var(--color-cyan);
-	opacity: 0.022;
-	filter: blur(0.8px);
-}
-
-.crt-overlay {
-	position: fixed;
-	inset: 0;
-	z-index: 50;
-	pointer-events: none;
-	overflow: hidden;
-}
-
-.crt-overlay > * {
-	position: absolute;
-	inset: 0;
-}
-
-.crt-scan {
-	background: repeating-linear-gradient(
-		to bottom,
-		transparent 0,
-		transparent 2px,
-		rgb(0 0 0 / 0.22) 2px,
-		rgb(0 0 0 / 0.22) 3px
-	);
-}
-
-.crt-roll {
-	inset: 0 0 auto 0;
-	height: 28vh;
-	background: linear-gradient(
-		to bottom,
-		transparent,
-		color-mix(in oklab, var(--color-cyan) 4%, transparent) 55%,
-		color-mix(in oklab, var(--color-cyan) 7%, transparent) 62%,
-		transparent
-	);
-	transform: translateY(-40vh);
-}
-
-.crt-grain {
-	inset: -20%;
-	opacity: 0.06;
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 1  0 0 0 0 0.9  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-	mix-blend-mode: screen;
-}
-
-.crt-flicker {
-	background: #000;
-	opacity: 0;
-}
-
-/* Vignette, plus the rounded corners of curved glass. */
-.crt-vignette {
-	background: radial-gradient(
-		ellipse 120% 110% at 50% 50%,
-		transparent 58%,
-		rgb(0 0 0 / 0.55) 88%,
-		rgb(0 0 0 / 0.85) 100%
-	);
-}
-.crt-bezel {
-	border-radius: 18px;
-	box-shadow:
-		0 0 0 40px #000,
-		inset 0 0 40px 6px rgb(0 0 0 / 0.75),
-		inset 0 0 2px 1px color-mix(in oklab, var(--color-cyan) 12%, transparent);
-}
-@media (min-width: 768px) {
-	.crt-bezel {
-		border-radius: 30px / 26px;
-	}
-}
-
-/* A thin band of torn signal, positioned by script for a single frame. */
-.crt-tear {
-	inset: 50% 0 auto 0;
-	height: 14px;
-	opacity: 0;
-	backdrop-filter: brightness(1.8) hue-rotate(40deg) blur(0.6px);
-	background: color-mix(in oklab, var(--color-cyan) 6%, transparent);
 }
 
 /* The power-on overlay for the first boot of a session. */
 .crt-power {
 	position: fixed;
 	inset: 0;
-	z-index: 40;
+	z-index: 60;
 	pointer-events: none;
 	background: #000;
 	animation: power-dark 1.15s ease-out forwards;
@@ -553,7 +475,7 @@ form.glow-edge:focus-within {
 .crt-static {
 	position: fixed;
 	inset: -20%;
-	z-index: 39;
+	z-index: 59;
 	pointer-events: none;
 	opacity: 0;
 	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.7  0 0 0 0 1  0 0 0 0 0.95  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
@@ -562,22 +484,10 @@ form.glow-edge:focus-within {
 
 @media (prefers-reduced-motion: no-preference) {
 	.crt-roll {
-		animation: roll 8.5s linear infinite;
-	}
-	.crt-grain {
-		animation: grain 0.9s steps(5) infinite;
-	}
-	.crt-flicker {
-		animation: flicker 5.3s steps(1, end) infinite;
+		animation: roll 9s linear infinite;
 	}
 	.crt-glass.is-live {
 		animation: breathe 2.4s ease-in-out infinite;
-	}
-	html[data-glitch] .crt-content {
-		animation: glitch-jolt 0.2s steps(4) 1;
-	}
-	html[data-glitch] .crt-tear {
-		opacity: 1;
 	}
 	.crt-static {
 		animation:

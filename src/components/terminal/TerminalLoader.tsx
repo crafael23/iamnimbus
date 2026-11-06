@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 // boot-once flag), so rendering it on the server would only cause a mismatch.
 const Terminal = dynamic(
 	() => import("./Terminal").then((m) => m.Terminal),
-	{ ssr: false, loading: () => <div className="min-h-[100dvh] bg-void" /> },
+	{ ssr: false, loading: () => <div className="h-full" /> },
 );
 
 export function TerminalLoader() {

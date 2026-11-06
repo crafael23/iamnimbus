@@ -33,7 +33,7 @@ export function AdminApp() {
 	const allowed = profile?.role === "admin";
 
 	return (
-		<div className="min-h-[100dvh] bg-void">
+		<div className="min-h-full">
 			<SiteNav />
 			<div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-12 lg:py-12">
 				{loading ? (

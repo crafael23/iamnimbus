@@ -18,7 +18,7 @@ export function UserLine({ text, handle }: { text: string; handle: string }) {
 }
 
 /**
- * A program reply: indented under a faint phosphor rule, typed out smoothly
+ * A program reply: indented, typed out smoothly
  * while it streams. The cursor advances while streaming, then blinks once and
  * holds on the latest reply.
  */
@@ -37,7 +37,7 @@ export function ProgramReply({
 	const failed = message.status === "failed";
 
 	return (
-		<div className={`reply-rule line-in mt-3 pl-[2ch] sm:ml-[1ch] ${TEXT}`}>
+		<div className={`line-in mt-3 pl-[2ch] ${TEXT}`}>
 			{visible ? (
 				<Markdown
 					variant="terminal"
@@ -62,7 +62,7 @@ export function ProgramReply({
 /** Shown between sending and the first streamed token. */
 export function AwaitingReply() {
 	return (
-		<div className={`reply-rule mt-3 pl-[2ch] sm:ml-[1ch] ${TEXT}`}>
+		<div className={`mt-3 pl-[2ch] ${TEXT}`}>
 			<span className="mr-2 uppercase tracking-[0.1em] text-dim">receiving</span>
 			<span aria-hidden className="cursor-block cursor-blink" />
 			<span className="sr-only">Waiting for a reply</span>

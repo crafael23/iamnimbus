@@ -26,8 +26,8 @@ export function BootSequence({
 	instant: boolean;
 	onDone: () => void;
 }) {
-	// header, wordmark, each line, the whisper, the hint
-	const total = lines.length + 4;
+	// wordmark, each line, the whisper, the hint
+	const total = lines.length + 3;
 	const [shown, setShown] = useState(instant ? total : 0);
 	const [powering, setPowering] = useState(!instant);
 	const done = shown >= total;
@@ -39,7 +39,7 @@ export function BootSequence({
 			return;
 		}
 		const delay =
-			shown === 0 ? (powering ? POWER_MS : 120) : shown === 2 ? WORDMARK_HOLD_MS : STEP_MS;
+			shown === 0 ? (powering ? POWER_MS : 120) : shown === 1 ? WORDMARK_HOLD_MS : STEP_MS;
 		const timer = window.setTimeout(() => setShown((n) => n + 1), delay);
 		return () => window.clearTimeout(timer);
 	}, [shown, done, powering, onDone]);
@@ -58,10 +58,8 @@ export function BootSequence({
 		};
 	}, [done, total]);
 
-	const header = "nimbus systems · terminal services · all transmissions logged";
-
 	return (
-		<section aria-label="System start" className="select-none pb-6 pt-8 sm:pt-14">
+		<section aria-label="System start" className="select-none pb-6 pt-10 sm:pt-20">
 			{/* Portaled so the flash covers the whole tube, nav included. */}
 			{powering &&
 				createPortal(
@@ -77,42 +75,28 @@ export function BootSequence({
 					document.body,
 				)}
 			{shown >= 1 && (
-				<p
-					className={`${animate ? "type-in" : ""} text-[14px] uppercase tracking-[0.2em] text-dim sm:text-[17px]`}
-					style={chars(header.length)}
-				>
-					{header}
-				</p>
-			)}
-			{shown >= 2 && (
 				<h1
-					className={`${animate ? "bleed-in" : "scanned"} mt-5 font-display text-[clamp(1.25rem,6.6vw,4.5rem)] leading-[1.08] text-ice`}
+					className={`${animate ? "bleed-in" : "scanned"} font-display text-[clamp(1.4rem,5.4vw,3.1rem)] leading-[1.08]`}
 				>
 					<span className="glow-text">nimbus</span>
-					<span className="text-cyan-dim">{"//"}</span>
-					<span>grid</span>
 				</h1>
 			)}
-			<ul className="mt-7 max-w-[36rem] space-y-0.5 text-[19px] sm:text-[21px]">
-				{lines.slice(0, Math.max(0, shown - 2)).map((line) => (
-					<li
-						key={line.label}
-						className={`${animate ? "type-in" : ""} flex items-baseline gap-2`}
-						style={chars(line.label.length + line.value.length + 18)}
-					>
-						<span className="text-cyan-dim">{">"}</span>
-						<span className="text-fog">{line.label}</span>
-						<span
-							aria-hidden
-							className="mx-1 flex-1 translate-y-[-5px] border-b border-dotted border-line-strong"
-						/>
-						<span className="text-ice">{line.value}</span>
-					</li>
+			<dl className="mt-8 grid grid-cols-[9ch_1fr] gap-x-3 text-[19px] leading-snug sm:text-[21px]">
+				{lines.slice(0, Math.max(0, shown - 1)).map((line) => (
+					<div key={line.label} className="contents">
+						<dt className={`${animate ? "line-in" : ""} text-dim`}>{line.label}</dt>
+						<dd
+							className={animate ? "type-in" : ""}
+							style={chars(line.value.length + 4)}
+						>
+							{line.value}
+						</dd>
+					</div>
 				))}
-			</ul>
-			{shown >= lines.length + 3 && (
+			</dl>
+			{shown >= lines.length + 2 && (
 				<p
-					className={`${animate ? "line-in" : ""} whisper mt-7 text-[19px] text-cyan-dim sm:text-[21px]`}
+					className={`${animate ? "line-in" : ""} whisper mt-8 text-[19px] text-cyan-dim sm:text-[21px]`}
 				>
 					someone left this terminal running.
 				</p>
@@ -126,7 +110,7 @@ export function BootSequence({
 				</p>
 			)}
 			{!done && (
-				<p className="mt-8 text-[15px] uppercase tracking-[0.16em] text-dim">
+				<p className="mt-10 text-[15px] uppercase tracking-[0.16em] text-dim">
 					press any key to skip
 				</p>
 			)}
