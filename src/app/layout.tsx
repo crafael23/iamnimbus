@@ -1,23 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Martian_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Sixtyfour, VT323 } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
+import { CrtScreen } from "@/components/CrtScreen";
 
-const display = Martian_Mono({
+/** Display: a variable face with real bleed and scanline axes, for titles only. */
+const display = Sixtyfour({
 	variable: "--nf-display",
 	subsets: ["latin"],
-	weight: ["300", "400", "600"],
+	axes: ["BLED", "SCAN"],
 });
 
+/** The terminal's own glyphs, from a DEC VT320 character ROM. */
+const crt = VT323({
+	variable: "--nf-crt",
+	subsets: ["latin"],
+	weight: "400",
+});
+
+/** Long-form reading, code and the admin. */
 const mono = IBM_Plex_Mono({
 	variable: "--nf-mono",
-	subsets: ["latin"],
-	weight: ["400", "500", "600"],
-	style: ["normal", "italic"],
-});
-
-const prose = IBM_Plex_Sans({
-	variable: "--nf-prose",
 	subsets: ["latin"],
 	weight: ["400", "500", "600"],
 	style: ["normal", "italic"],
@@ -30,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	themeColor: "#04070a",
+	themeColor: "#000000",
 	width: "device-width",
 	initialScale: 1,
 	viewportFit: "cover",
@@ -40,9 +43,12 @@ export default function RootLayout({
 	children,
 }: Readonly<{ children: React.ReactNode }>) {
 	return (
-		<html lang="en" className={`${display.variable} ${mono.variable} ${prose.variable}`}>
+		<html lang="en" className={`${display.variable} ${crt.variable} ${mono.variable}`}>
 			<body>
-				<ConvexClientProvider>{children}</ConvexClientProvider>
+				<ConvexClientProvider>
+					<div className="crt-content">{children}</div>
+				</ConvexClientProvider>
+				<CrtScreen />
 			</body>
 		</html>
 	);

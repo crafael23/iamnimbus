@@ -26,30 +26,31 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 	const isActive = (href: string) =>
 		href === "/" ? pathname === "/" : pathname.startsWith(href);
 
+	const linkClass = (href: string) =>
+		isActive(href)
+			? "reverse px-1 sm:px-1.5"
+			: "px-1 text-dim transition-colors hover:text-ice sm:px-1.5";
+
 	return (
-		<header className="relative z-20 border-b border-line/70 bg-void/80 backdrop-blur-sm">
+		<header className="crt-text relative z-20 border-b border-line/80 bg-void/70 font-crt">
 			<nav
 				aria-label="Primary"
-				className="mx-auto flex h-14 max-w-[1100px] items-center gap-4 px-4 text-[12px] sm:gap-7 sm:px-6 sm:text-[13px]"
+				className="mx-auto flex h-14 max-w-[1100px] items-center gap-2.5 px-4 text-[17px] uppercase tracking-[0.04em] sm:gap-7 sm:px-8 sm:text-[20px] sm:tracking-[0.08em]"
 			>
 				<Link
 					href="/"
-					className="font-display text-[12px] tracking-[0.08em] text-ice whitespace-nowrap"
+					className="scanned whitespace-nowrap font-display text-[11px] normal-case tracking-normal text-ice sm:text-[12px]"
 				>
 					<span className="glow-text">nimbus</span>
 					<span className="hidden text-dim sm:inline">{"//"}grid</span>
 				</Link>
-				<ul className="flex items-center gap-3.5 sm:gap-6">
+				<ul className="flex items-center gap-0.5 sm:gap-4">
 					{LINKS.map((link) => (
 						<li key={link.href}>
 							<Link
 								href={link.href}
 								aria-current={isActive(link.href) ? "page" : undefined}
-								className={
-									isActive(link.href)
-										? "text-cyan"
-										: "text-dim transition-colors hover:text-ice"
-								}
+								className={linkClass(link.href)}
 							>
 								{link.label}
 							</Link>
@@ -60,24 +61,20 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 							<Link
 								href="/admin"
 								aria-current={isActive("/admin") ? "page" : undefined}
-								className={
-									isActive("/admin")
-										? "text-cyan"
-										: "text-dim transition-colors hover:text-ice"
-								}
+								className={linkClass("/admin")}
 							>
 								admin
 							</Link>
 						</li>
 					)}
 				</ul>
-				<div className="ml-auto flex items-center gap-4 pl-2">
+				<div className="ml-auto flex items-center gap-4 pl-1">
 					{status}
 					{loading ? null : user ? (
 						<button
 							type="button"
 							onClick={() => void signOut()}
-							className="text-dim transition-colors hover:text-ice whitespace-nowrap"
+							className="whitespace-nowrap uppercase text-dim transition-colors hover:text-ice"
 						>
 							sign out
 						</button>
@@ -86,7 +83,7 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 						// oxlint-disable-next-line nextjs/no-html-link-for-pages
 						<a
 							href="/sign-in"
-							className="text-cyan transition-colors hover:text-ice whitespace-nowrap"
+							className="whitespace-nowrap text-cyan transition-colors hover:text-ice"
 						>
 							sign in
 						</a>

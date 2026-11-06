@@ -43,7 +43,7 @@ export function AdminApp() {
 				) : !allowed ? (
 					<div className="lg:col-span-2 max-w-[52ch]">
 						<p className="font-display text-sm text-amber">restricted</p>
-						<h1 className="mt-3 font-display text-xl font-light text-ice">This area is for the site owner.</h1>
+						<h1 className="mt-3 font-display text-xl text-ice">This area is for the site owner.</h1>
 						<p className="mt-3 text-[13px] leading-relaxed text-fog">
 							{isAuthenticated
 								? "Your account does not have the admin role. Roles come from the WorkOS organization membership."

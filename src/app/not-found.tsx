@@ -4,8 +4,8 @@ import { PageShell } from "@/components/PageShell";
 export default function NotFound() {
 	return (
 		<PageShell>
-			<p className="font-display text-sm text-amber">404</p>
-			<h1 className="mt-4 font-display text-2xl font-light text-ice">
+			<p className="font-crt text-[20px] uppercase tracking-[0.14em] glow-amber">error 404 · no signal</p>
+			<h1 className="scanned mt-5 font-display text-[clamp(1.2rem,4vw,1.9rem)] leading-[1.25] text-ice">
 				Nothing on the grid at this address.
 			</h1>
 			<p className="mt-4 font-prose text-fog">

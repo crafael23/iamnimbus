@@ -1,31 +1,37 @@
 @import "tailwindcss";
 
 /*
- * Grid system tokens. One theme (dark), locked: the brief is a near-black
- * terminal. Cyan is the system ("programs"); amber is reserved for the
- * visitor's own input and for limits ("users").
+ * Phosphor tokens. One theme, locked: a monochrome CRT left running in a dark
+ * room. The "cyan" family is the phosphor (the system speaking); amber is
+ * reserved for the visitor's own input and for alarms. Token names are kept
+ * from the first design so every surface retones from here.
  */
 @theme {
-	--color-void: #04070a;
-	--color-deep: #071016;
-	--color-panel: #0a161c;
-	--color-line: #12313a;
-	--color-line-strong: #1d4a55;
-	--color-cyan: #5ce1f0;
-	--color-cyan-dim: #2c8d99;
-	--color-ice: #cdeef3;
-	--color-fog: #8fb3ba;
-	--color-dim: #5d7c84;
-	--color-amber: #f0a35e;
-	--color-amber-dim: #9a6a3f;
-	--color-danger: #ff7a6b;
+	--color-void: #020607;
+	--color-deep: #04100f;
+	--color-panel: #061614;
+	--color-line: #123330;
+	--color-line-strong: #1f4f49;
+	--color-cyan: #7df9e0;
+	--color-cyan-dim: #3a9c8b;
+	--color-ice: #c4f8ec;
+	--color-fog: #82b8ab;
+	--color-dim: #4f7d73;
+	--color-amber: #ffb454;
+	--color-amber-dim: #a8742f;
+	--color-danger: #ff6f5e;
 
 	--font-display: var(--nf-display), ui-monospace, monospace;
+	--font-crt: var(--nf-crt), ui-monospace, monospace;
 	--font-mono: var(--nf-mono), ui-monospace, monospace;
-	--font-prose: var(--nf-prose), ui-sans-serif, system-ui, sans-serif;
+	--font-prose: var(--nf-mono), ui-monospace, monospace;
 
 	--animate-blink: blink 1.05s steps(1, end) infinite;
 }
+
+/* ------------------------------------------------------------------ */
+/* Keyframes                                                           */
+/* ------------------------------------------------------------------ */
 
 @keyframes blink {
 	0%,
@@ -53,29 +59,243 @@
 	}
 }
 
-@keyframes grid-flow {
-	from {
-		background-position: 0 0;
+/* New output lands hot, then the phosphor cools to its resting glow. */
+@keyframes phosphor-in {
+	0% {
+		opacity: 0;
+		filter: brightness(2.6) blur(1.4px);
 	}
-	to {
-		background-position: 0 64px;
+	35% {
+		opacity: 1;
+		filter: brightness(1.7) blur(0.3px);
+	}
+	100% {
+		opacity: 1;
+		filter: none;
 	}
 }
 
-@keyframes line-in {
+/* Typewriter reveal; --n is the character count, set inline. */
+@keyframes type-in {
 	from {
-		opacity: 0;
-		transform: translateY(4px);
+		clip-path: inset(0 100% 0 0);
 	}
 	to {
-		opacity: 1;
-		transform: none;
+		clip-path: inset(0 0 0 0);
 	}
 }
+
+/* Power-on: a beam draws across, opens to a flash, and the flash decays. */
+@keyframes power-beam {
+	0% {
+		opacity: 1;
+		transform: scale(0, 0.004);
+	}
+	22% {
+		opacity: 1;
+		transform: scale(1, 0.004);
+	}
+	42% {
+		opacity: 0.9;
+		transform: scale(1, 1);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(1.08, 1.08);
+	}
+}
+@keyframes power-dark {
+	0%,
+	38% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* The wordmark's phosphor bleeds, then focuses into scanlined glyphs. */
+@keyframes bleed-in {
+	0% {
+		opacity: 0;
+		font-variation-settings: "BLED" 100, "SCAN" 100;
+		letter-spacing: 0.3em;
+		filter: blur(6px) brightness(2);
+	}
+	30% {
+		opacity: 1;
+	}
+	70% {
+		font-variation-settings: "BLED" 22, "SCAN" 40;
+		filter: blur(0.6px) brightness(1.3);
+	}
+	100% {
+		opacity: 1;
+		font-variation-settings: "BLED" 8, "SCAN" 18;
+		letter-spacing: 0;
+		filter: none;
+	}
+}
+
+@keyframes static-burst {
+	0% {
+		opacity: 0.55;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes roll {
+	from {
+		transform: translateY(-40vh);
+	}
+	to {
+		transform: translateY(140vh);
+	}
+}
+
+@keyframes grain {
+	0% {
+		transform: translate(0, 0);
+	}
+	20% {
+		transform: translate(-6%, 4%);
+	}
+	40% {
+		transform: translate(5%, -7%);
+	}
+	60% {
+		transform: translate(-3%, -2%);
+	}
+	80% {
+		transform: translate(7%, 5%);
+	}
+	100% {
+		transform: translate(0, 0);
+	}
+}
+
+@keyframes flicker {
+	0%,
+	100% {
+		opacity: 0;
+	}
+	7% {
+		opacity: 0.05;
+	}
+	8% {
+		opacity: 0;
+	}
+	46% {
+		opacity: 0.025;
+	}
+	47% {
+		opacity: 0;
+	}
+	83% {
+		opacity: 0.06;
+	}
+	84% {
+		opacity: 0.01;
+	}
+}
+
+@keyframes glitch-jolt {
+	0% {
+		transform: none;
+		filter: none;
+	}
+	25% {
+		transform: translateX(4px) skewX(-1.5deg);
+		filter: hue-rotate(25deg) brightness(1.25);
+	}
+	50% {
+		transform: translateX(-3px);
+		filter: hue-rotate(-20deg);
+	}
+	75% {
+		transform: translateX(1px) skewX(0.6deg);
+	}
+	100% {
+		transform: none;
+		filter: none;
+	}
+}
+
+@keyframes degauss {
+	0% {
+		transform: none;
+		filter: none;
+	}
+	12% {
+		transform: scale(1.015) skewX(1.6deg);
+		filter: hue-rotate(80deg) saturate(2) brightness(1.4);
+	}
+	30% {
+		transform: scale(0.994) skewX(-1.1deg);
+		filter: hue-rotate(-60deg) saturate(1.6);
+	}
+	52% {
+		transform: scale(1.004) skewX(0.5deg);
+		filter: hue-rotate(30deg);
+	}
+	74% {
+		transform: skewX(-0.2deg);
+		filter: hue-rotate(-10deg);
+	}
+	100% {
+		transform: none;
+		filter: none;
+	}
+}
+
+@keyframes breathe {
+	0%,
+	100% {
+		opacity: 0.55;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+@keyframes screen-in {
+	0% {
+		opacity: 0;
+		transform: scaleY(0.985);
+		filter: brightness(2.2) blur(2px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+		filter: none;
+	}
+}
+
+@keyframes whisper {
+	0%,
+	100% {
+		opacity: 0.5;
+	}
+	48% {
+		opacity: 0.85;
+	}
+	50% {
+		opacity: 0.3;
+	}
+	52% {
+		opacity: 0.8;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
 
 @layer base {
 	html {
-		background: var(--color-void);
+		background: #000;
 		color-scheme: dark;
 	}
 
@@ -88,8 +308,9 @@
 	}
 
 	::selection {
-		background: color-mix(in oklab, var(--color-cyan) 35%, transparent);
-		color: #ffffff;
+		background: var(--color-cyan);
+		color: var(--color-void);
+		text-shadow: none;
 	}
 
 	:focus-visible {
@@ -99,38 +320,62 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Glow primitives                                                     */
+/* Phosphor text                                                       */
 /* ------------------------------------------------------------------ */
+
+/* Resting glow plus a hint of convergence error at the glyph edges. */
+.crt-text {
+	text-shadow:
+		0 0 1px color-mix(in oklab, currentColor 70%, transparent),
+		0 0 8px color-mix(in oklab, currentColor 32%, transparent),
+		0.6px 0 0 rgb(255 40 90 / 0.14),
+		-0.6px 0 0 rgb(40 170 255 / 0.14);
+}
 
 .glow-text {
 	color: var(--color-cyan);
 	text-shadow:
-		0 0 6px color-mix(in oklab, var(--color-cyan) 55%, transparent),
-		0 0 22px color-mix(in oklab, var(--color-cyan) 25%, transparent);
+		0 0 2px color-mix(in oklab, var(--color-cyan) 80%, transparent),
+		0 0 10px color-mix(in oklab, var(--color-cyan) 55%, transparent),
+		0 0 28px color-mix(in oklab, var(--color-cyan) 28%, transparent);
 }
 
 .glow-amber {
 	color: var(--color-amber);
-	text-shadow: 0 0 10px color-mix(in oklab, var(--color-amber) 40%, transparent);
+	text-shadow:
+		0 0 2px color-mix(in oklab, var(--color-amber) 80%, transparent),
+		0 0 12px color-mix(in oklab, var(--color-amber) 45%, transparent);
 }
 
 .glow-edge {
-	border: 1px solid color-mix(in oklab, var(--color-cyan) 55%, transparent);
+	border: 1px solid color-mix(in oklab, var(--color-cyan) 45%, transparent);
 	box-shadow:
-		0 0 0 1px color-mix(in oklab, var(--color-cyan) 8%, transparent),
-		0 0 18px -2px color-mix(in oklab, var(--color-cyan) 35%, transparent),
-		inset 0 0 18px -6px color-mix(in oklab, var(--color-cyan) 30%, transparent);
+		0 0 16px -4px color-mix(in oklab, var(--color-cyan) 35%, transparent),
+		inset 0 0 22px -8px color-mix(in oklab, var(--color-cyan) 30%, transparent);
 }
 
 form.glow-edge:focus-within {
-	border-color: color-mix(in oklab, var(--color-cyan) 80%, transparent);
+	border-color: color-mix(in oklab, var(--color-cyan) 75%, transparent);
 	box-shadow:
-		0 0 0 1px color-mix(in oklab, var(--color-cyan) 14%, transparent),
-		0 0 26px -2px color-mix(in oklab, var(--color-cyan) 50%, transparent),
-		inset 0 0 22px -6px color-mix(in oklab, var(--color-cyan) 38%, transparent);
+		0 0 24px -4px color-mix(in oklab, var(--color-cyan) 50%, transparent),
+		inset 0 0 26px -8px color-mix(in oklab, var(--color-cyan) 40%, transparent);
 }
 
-/* A program reply hangs off a glowing vertical rule. */
+/* Reverse video: the CRT's only way to highlight. */
+.reverse {
+	background: var(--color-cyan);
+	color: var(--color-void);
+	text-shadow: none;
+	box-shadow: 0 0 14px -2px color-mix(in oklab, var(--color-cyan) 60%, transparent);
+}
+.reverse-amber {
+	background: var(--color-amber);
+	color: var(--color-void);
+	text-shadow: none;
+	box-shadow: 0 0 16px -2px color-mix(in oklab, var(--color-amber) 60%, transparent);
+}
+
+/* A program reply hangs off a faint phosphor rule. */
 .reply-rule {
 	position: relative;
 }
@@ -138,21 +383,21 @@ form.glow-edge:focus-within {
 	content: "";
 	position: absolute;
 	left: 0;
-	top: 0.2em;
-	bottom: 0.2em;
+	top: 0.25em;
+	bottom: 0.25em;
 	width: 1px;
-	background: var(--color-cyan-dim);
-	box-shadow: 0 0 8px 0 color-mix(in oklab, var(--color-cyan) 55%, transparent);
+	background: var(--color-line-strong);
+	box-shadow: 0 0 6px 0 color-mix(in oklab, var(--color-cyan) 35%, transparent);
 }
 
 .cursor-block {
 	display: inline-block;
-	width: 0.62em;
-	height: 1.15em;
+	width: 0.55em;
+	height: 1em;
 	margin-left: 1px;
-	vertical-align: -0.2em;
+	vertical-align: -0.12em;
 	background: var(--color-cyan);
-	box-shadow: 0 0 10px color-mix(in oklab, var(--color-cyan) 70%, transparent);
+	box-shadow: 0 0 12px color-mix(in oklab, var(--color-cyan) 75%, transparent);
 }
 
 .cursor-blink {
@@ -163,80 +408,200 @@ form.glow-edge:focus-within {
 	animation: blink-once 0.9s steps(1, end) 1;
 }
 
+/* Sixtyfour's scanline axis, held slightly open for display type. */
+.scanned {
+	font-variation-settings: "BLED" 8, "SCAN" 18;
+}
+
 /* ------------------------------------------------------------------ */
-/* The grid: a flat wall grid plus a perspective floor at the horizon  */
+/* The screen: glass, burn-in and the effects layer                    */
 /* ------------------------------------------------------------------ */
 
-.grid-wall {
+/* Center lift of a warm tube; breathes while a reply is arriving. */
+.crt-glass {
 	position: fixed;
 	inset: 0;
 	pointer-events: none;
-	background-image:
-		linear-gradient(to right, color-mix(in oklab, var(--color-line) 55%, transparent) 1px, transparent 1px),
-		linear-gradient(to bottom, color-mix(in oklab, var(--color-line) 55%, transparent) 1px, transparent 1px);
-	background-size: 48px 48px;
-	mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 0%, transparent 75%);
-	opacity: 0.35;
+	background: radial-gradient(
+		ellipse 70% 60% at 50% 45%,
+		color-mix(in oklab, var(--color-cyan) 7%, transparent) 0%,
+		transparent 70%
+	);
+	opacity: 0.55;
+	transition: opacity 1s ease;
 }
 
-.grid-floor {
+/* A ghost of the wordmark, burned into the phosphor by years of idling. */
+.crt-burn {
 	position: fixed;
-	left: -50%;
-	right: -50%;
-	bottom: 0;
-	height: 46vh;
+	left: 50%;
+	top: 52%;
+	transform: translate(-50%, -50%);
 	pointer-events: none;
-	perspective: 340px;
-	perspective-origin: 50% 0%;
+	user-select: none;
+	white-space: nowrap;
+	font-family: var(--font-display);
+	font-size: clamp(3rem, 15vw, 14rem);
+	font-variation-settings: "BLED" 25, "SCAN" 80;
+	color: var(--color-cyan);
+	opacity: 0.022;
+	filter: blur(0.8px);
+}
+
+.crt-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	pointer-events: none;
 	overflow: hidden;
 }
 
-.grid-floor::before {
-	content: "";
+.crt-overlay > * {
 	position: absolute;
-	inset: 0 0 -60% 0;
-	transform-origin: 50% 0%;
-	transform: rotateX(62deg);
-	background-image:
-		linear-gradient(to right, color-mix(in oklab, var(--color-cyan) 38%, transparent) 1px, transparent 1px),
-		linear-gradient(to bottom, color-mix(in oklab, var(--color-cyan) 38%, transparent) 1px, transparent 1px);
-	background-size: 64px 64px;
-	mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 100%);
-	opacity: 0.22;
+	inset: 0;
 }
 
-.grid-floor::after {
-	/* the horizon line */
-	content: "";
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 0;
-	height: 1px;
+.crt-scan {
+	background: repeating-linear-gradient(
+		to bottom,
+		transparent 0,
+		transparent 2px,
+		rgb(0 0 0 / 0.22) 2px,
+		rgb(0 0 0 / 0.22) 3px
+	);
+}
+
+.crt-roll {
+	inset: 0 0 auto 0;
+	height: 28vh;
 	background: linear-gradient(
-		to right,
+		to bottom,
 		transparent,
-		color-mix(in oklab, var(--color-cyan) 70%, transparent) 30%,
-		color-mix(in oklab, var(--color-cyan) 70%, transparent) 70%,
+		color-mix(in oklab, var(--color-cyan) 4%, transparent) 55%,
+		color-mix(in oklab, var(--color-cyan) 7%, transparent) 62%,
 		transparent
 	);
-	box-shadow: 0 0 24px 2px color-mix(in oklab, var(--color-cyan) 30%, transparent);
-	opacity: 0.55;
+	transform: translateY(-40vh);
 }
 
-.grid-floor {
-	transition: opacity 1.2s ease;
+.crt-grain {
+	inset: -20%;
+	opacity: 0.06;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 1  0 0 0 0 0.9  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+	mix-blend-mode: screen;
 }
-.grid-floor.is-dim {
-	opacity: 0.45;
+
+.crt-flicker {
+	background: #000;
+	opacity: 0;
+}
+
+/* Vignette, plus the rounded corners of curved glass. */
+.crt-vignette {
+	background: radial-gradient(
+		ellipse 120% 110% at 50% 50%,
+		transparent 58%,
+		rgb(0 0 0 / 0.55) 88%,
+		rgb(0 0 0 / 0.85) 100%
+	);
+}
+.crt-bezel {
+	border-radius: 18px;
+	box-shadow:
+		0 0 0 40px #000,
+		inset 0 0 40px 6px rgb(0 0 0 / 0.75),
+		inset 0 0 2px 1px color-mix(in oklab, var(--color-cyan) 12%, transparent);
+}
+@media (min-width: 768px) {
+	.crt-bezel {
+		border-radius: 30px / 26px;
+	}
+}
+
+/* A thin band of torn signal, positioned by script for a single frame. */
+.crt-tear {
+	inset: 50% 0 auto 0;
+	height: 14px;
+	opacity: 0;
+	backdrop-filter: brightness(1.8) hue-rotate(40deg) blur(0.6px);
+	background: color-mix(in oklab, var(--color-cyan) 6%, transparent);
+}
+
+/* The power-on overlay for the first boot of a session. */
+.crt-power {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	pointer-events: none;
+	background: #000;
+	animation: power-dark 1.15s ease-out forwards;
+}
+.crt-power::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(
+		ellipse 60% 50% at 50% 50%,
+		#ffffff 0%,
+		color-mix(in oklab, var(--color-cyan) 85%, white) 30%,
+		color-mix(in oklab, var(--color-cyan) 25%, transparent) 62%,
+		transparent 80%
+	);
+	transform: scale(0, 0.004);
+	animation: power-beam 1.15s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.crt-static {
+	position: fixed;
+	inset: -20%;
+	z-index: 39;
+	pointer-events: none;
+	opacity: 0;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.7  0 0 0 0 1  0 0 0 0 0.95  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
+	mix-blend-mode: screen;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.grid-floor.is-live::before {
-		animation: grid-flow 3.2s linear infinite;
+	.crt-roll {
+		animation: roll 8.5s linear infinite;
+	}
+	.crt-grain {
+		animation: grain 0.9s steps(5) infinite;
+	}
+	.crt-flicker {
+		animation: flicker 5.3s steps(1, end) infinite;
+	}
+	.crt-glass.is-live {
+		animation: breathe 2.4s ease-in-out infinite;
+	}
+	html[data-glitch] .crt-content {
+		animation: glitch-jolt 0.2s steps(4) 1;
+	}
+	html[data-glitch] .crt-tear {
+		opacity: 1;
+	}
+	.crt-static {
+		animation:
+			static-burst 0.9s ease-out 0.35s both,
+			grain 0.25s steps(4) infinite;
+	}
+	.degauss {
+		animation: degauss 0.95s cubic-bezier(0.3, 0.7, 0.2, 1) 1;
 	}
 	.line-in {
-		animation: line-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+		animation: phosphor-in 0.55s ease-out both;
+	}
+	.type-in {
+		animation: type-in calc(var(--n, 24) * 14ms) steps(var(--n, 24), end) both;
+	}
+	.bleed-in {
+		animation: bleed-in 1.9s cubic-bezier(0.2, 0.7, 0.1, 1) both;
+	}
+	.whisper {
+		animation: whisper 6s ease-in-out infinite;
+	}
+	.screen-in {
+		animation: screen-in 0.5s ease-out both;
+		transform-origin: 50% 40%;
 	}
 }
 
@@ -244,6 +609,11 @@ form.glow-edge:focus-within {
 	.cursor-blink,
 	.cursor-settle {
 		animation: none;
+	}
+	.crt-power,
+	.crt-static,
+	.crt-roll {
+		display: none;
 	}
 }
 
@@ -253,35 +623,44 @@ form.glow-edge:focus-within {
 
 .term-md {
 	color: var(--color-ice);
-	line-height: 1.7;
+	line-height: 1.38;
 	overflow-wrap: anywhere;
 }
 .term-md > * + * {
-	margin-top: 0.75em;
+	margin-top: 0.7em;
 }
+/* VT323 has one weight: emphasis is intensity, as on the real tubes. */
 .term-md strong {
-	color: #ffffff;
-	font-weight: 600;
+	color: #f2fffb;
+	font-weight: 400;
+	text-shadow:
+		0 0 2px color-mix(in oklab, var(--color-cyan) 90%, transparent),
+		0 0 12px color-mix(in oklab, var(--color-cyan) 55%, transparent);
 }
 .term-md em {
+	font-style: normal;
 	color: var(--color-fog);
 }
 .term-md a {
 	color: var(--color-cyan);
 	text-decoration: underline;
-	text-decoration-color: color-mix(in oklab, var(--color-cyan) 40%, transparent);
+	text-decoration-color: color-mix(in oklab, var(--color-cyan) 45%, transparent);
 	text-underline-offset: 3px;
 }
 .term-md a:hover {
-	text-decoration-color: var(--color-cyan);
+	background: var(--color-cyan);
+	color: var(--color-void);
+	text-decoration: none;
+	text-shadow: none;
 }
 .term-md h1,
 .term-md h2,
 .term-md h3,
 .term-md h4 {
 	color: var(--color-cyan);
-	font-weight: 600;
-	letter-spacing: 0.02em;
+	font-weight: 400;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
 }
 .term-md h1::before,
 .term-md h2::before {
@@ -302,7 +681,7 @@ form.glow-edge:focus-within {
 	position: relative;
 }
 .term-md ul > li::before {
-	content: "›";
+	content: "\25B8";
 	position: absolute;
 	left: -2ch;
 	color: var(--color-cyan);
@@ -314,23 +693,23 @@ form.glow-edge:focus-within {
 	color: var(--color-cyan-dim);
 }
 .term-md li + li {
-	margin-top: 0.3em;
+	margin-top: 0.25em;
 }
 .term-md code {
+	font-family: inherit;
+	font-size: inherit;
 	color: var(--color-cyan);
-	background: color-mix(in oklab, var(--color-cyan) 9%, transparent);
-	padding: 0.05em 0.35em;
-	border-radius: 2px;
+	background: color-mix(in oklab, var(--color-cyan) 10%, transparent);
+	padding: 0 0.3em;
 }
 .term-md pre {
 	position: relative;
-	background: var(--color-deep);
+	background: color-mix(in oklab, var(--color-deep) 85%, transparent);
 	border: 1px solid var(--color-line);
 	border-left: 2px solid var(--color-cyan-dim);
-	padding: 0.9em 1em;
+	padding: 0.7em 1em;
 	overflow-x: auto;
-	font-size: 0.92em;
-	line-height: 1.55;
+	line-height: 1.3;
 }
 .term-md pre code {
 	background: none;
@@ -348,17 +727,41 @@ form.glow-edge:focus-within {
 }
 .term-md table {
 	border-collapse: collapse;
-	font-size: 0.92em;
 }
 .term-md th,
 .term-md td {
 	border: 1px solid var(--color-line);
-	padding: 0.3em 0.7em;
+	padding: 0.15em 0.7em;
 	text-align: left;
 }
 .term-md th {
 	color: var(--color-cyan);
-	font-weight: 500;
+	font-weight: 400;
+	text-transform: uppercase;
+}
+
+/* Inline cursor at the end of a reply, attached to its last text block. */
+.term-md[data-cursor] > :last-child:not(ul, ol, pre, hr, table)::after,
+.term-md[data-cursor] > :is(ul, ol):last-child > li:last-child::after,
+.term-md[data-cursor] > pre:last-child > code::after {
+	content: "";
+	display: inline-block;
+	width: 0.55em;
+	height: 1em;
+	margin-left: 2px;
+	vertical-align: -0.12em;
+	background: var(--color-cyan);
+	box-shadow: 0 0 12px color-mix(in oklab, var(--color-cyan) 75%, transparent);
+}
+.term-md[data-cursor="settled"] > :last-child:not(ul, ol, pre, hr, table)::after,
+.term-md[data-cursor="settled"] > :is(ul, ol):last-child > li:last-child::after,
+.term-md[data-cursor="settled"] > pre:last-child > code::after {
+	animation: blink-once 0.9s steps(1, end) 1;
+}
+@media (prefers-reduced-motion: reduce) {
+	.term-md[data-cursor] *::after {
+		animation: none !important;
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -367,32 +770,41 @@ form.glow-edge:focus-within {
 
 .prose-grid {
 	font-family: var(--font-prose);
-	font-size: 1.125rem;
-	line-height: 1.75;
-	color: #d7e8eb;
+	font-size: 1rem;
+	line-height: 1.8;
+	color: #b9e9de;
 	max-width: 68ch;
 }
 .prose-grid > * + * {
-	margin-top: 1.15em;
+	margin-top: 1.2em;
 }
 .prose-grid h2,
 .prose-grid h3 {
-	font-family: var(--font-display);
-	color: var(--color-ice);
+	font-family: var(--font-crt);
+	color: var(--color-cyan);
 	font-weight: 400;
-	letter-spacing: -0.01em;
-	line-height: 1.3;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	line-height: 1.2;
 	margin-top: 2.2em;
 }
 .prose-grid h2 {
-	font-size: 1.35rem;
+	font-size: 1.75rem;
 }
 .prose-grid h3 {
-	font-size: 1.1rem;
+	font-size: 1.4rem;
+}
+.prose-grid h2::before {
+	content: "## ";
+	color: var(--color-cyan-dim);
+}
+.prose-grid h3::before {
+	content: "### ";
+	color: var(--color-cyan-dim);
 }
 .prose-grid h2 + *,
 .prose-grid h3 + * {
-	margin-top: 0.7em;
+	margin-top: 0.6em;
 }
 .prose-grid a {
 	color: var(--color-cyan);
@@ -405,7 +817,7 @@ form.glow-edge:focus-within {
 	text-decoration-color: var(--color-cyan);
 }
 .prose-grid strong {
-	color: #ffffff;
+	color: #effff9;
 	font-weight: 600;
 }
 .prose-grid ul,
@@ -430,15 +842,12 @@ form.glow-edge:focus-within {
 	color: var(--color-fog);
 }
 .prose-grid code {
-	font-family: var(--font-mono);
-	font-size: 0.86em;
+	font-size: 0.92em;
 	color: var(--color-cyan);
-	background: color-mix(in oklab, var(--color-cyan) 9%, transparent);
+	background: color-mix(in oklab, var(--color-cyan) 10%, transparent);
 	padding: 0.1em 0.35em;
-	border-radius: 2px;
 }
 .prose-grid pre {
-	font-family: var(--font-mono);
 	font-size: 0.88rem;
 	line-height: 1.6;
 	background: var(--color-deep);
@@ -454,7 +863,7 @@ form.glow-edge:focus-within {
 }
 .prose-grid hr {
 	border: 0;
-	border-top: 1px solid var(--color-line);
+	border-top: 1px dashed var(--color-line-strong);
 	margin: 2.5em 0;
 }
 .prose-grid img {
@@ -463,32 +872,7 @@ form.glow-edge:focus-within {
 
 @media (max-width: 640px) {
 	.prose-grid {
-		font-size: 1.0625rem;
-		line-height: 1.7;
-	}
-}
-
-/* Inline cursor at the end of a reply, attached to its last text block. */
-.term-md[data-cursor] > :last-child:not(ul, ol, pre, hr, table)::after,
-.term-md[data-cursor] > :is(ul, ol):last-child > li:last-child::after,
-.term-md[data-cursor] > pre:last-child > code::after {
-	content: "";
-	display: inline-block;
-	width: 0.62em;
-	height: 1.15em;
-	margin-left: 2px;
-	vertical-align: -0.2em;
-	background: var(--color-cyan);
-	box-shadow: 0 0 10px color-mix(in oklab, var(--color-cyan) 70%, transparent);
-}
-.term-md[data-cursor="settled"] > :last-child:not(ul, ol, pre, hr, table)::after,
-.term-md[data-cursor="settled"] > :is(ul, ol):last-child > li:last-child::after,
-.term-md[data-cursor="settled"] > pre:last-child > code::after {
-	opacity: 0.7;
-	animation: blink-once 0.9s steps(1, end) 1;
-}
-@media (prefers-reduced-motion: reduce) {
-	.term-md[data-cursor] *::after {
-		animation: none !important;
+		font-size: 0.97rem;
+		line-height: 1.75;
 	}
 }

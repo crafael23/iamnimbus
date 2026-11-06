@@ -12,10 +12,10 @@ export default async function BlogIndex() {
 	return (
 		<PageShell>
 			<header className="max-w-[68ch]">
-				<h1 className="font-display text-[clamp(1.8rem,5vw,2.75rem)] font-light leading-[1.1] tracking-[-0.02em] text-ice">
+				<h1 className="scanned font-display text-[clamp(1.6rem,5.5vw,2.8rem)] leading-[1.12] text-ice">
 					Writing
 				</h1>
-				<p className="mt-4 font-prose text-lg leading-relaxed text-fog">
+				<p className="mt-5 font-prose text-base leading-relaxed text-fog">
 					Long-form notes on building things. Every post here is also in the
 					terminal&apos;s memory.
 				</p>
@@ -32,20 +32,20 @@ export default async function BlogIndex() {
 			) : (
 				<ol className="mt-14 max-w-[820px]">
 					{posts.map((post) => (
-						<li key={post._id} className="group border-t border-line first:border-t-0">
+						<li key={post._id} className="group border-t border-dashed border-line-strong first:border-t-0">
 							<Link
 								href={`/blog/${post.slug}`}
-								className="grid gap-2 py-8 sm:grid-cols-[9rem_1fr] sm:gap-8"
+								className="grid gap-2 py-7 sm:grid-cols-[10rem_1fr] sm:gap-8"
 							>
-								<span className="pt-1 text-[12px] text-dim">
+								<span className="pt-1 font-crt text-[17px] uppercase tracking-[0.08em] text-dim">
 									{post.publishedAt ? formatDate(post.publishedAt) : ""}
 									<span className="mt-1 block">{post.readingMinutes} min read</span>
 								</span>
 								<span>
-									<span className="block font-display text-lg leading-snug text-ice transition-colors group-hover:text-cyan sm:text-xl">
+									<span className="block font-crt text-[26px] uppercase leading-[1.1] tracking-[0.03em] text-ice transition-colors group-hover:text-cyan sm:text-[30px]">
 										{post.title}
 									</span>
-									<span className="mt-2 block font-prose text-base leading-relaxed text-fog">
+									<span className="mt-2 block font-prose text-[15px] leading-relaxed text-fog">
 										{post.excerpt}
 									</span>
 								</span>

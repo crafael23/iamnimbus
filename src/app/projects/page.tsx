@@ -12,10 +12,10 @@ export default async function ProjectsIndex() {
 	return (
 		<PageShell>
 			<header className="max-w-[68ch]">
-				<h1 className="font-display text-[clamp(1.8rem,5vw,2.75rem)] font-light leading-[1.1] tracking-[-0.02em] text-ice">
+				<h1 className="scanned font-display text-[clamp(1.6rem,5.5vw,2.8rem)] leading-[1.12] text-ice">
 					Projects
 				</h1>
-				<p className="mt-4 font-prose text-lg leading-relaxed text-fog">
+				<p className="mt-5 font-prose text-base leading-relaxed text-fog">
 					A considered selection: the problem, what was built, and the decisions
 					behind it.
 				</p>
@@ -24,21 +24,21 @@ export default async function ProjectsIndex() {
 			{projects.length === 0 ? (
 				<p className="mt-16 font-prose text-fog">No projects are published yet.</p>
 			) : (
-				<ul className="mt-14 grid gap-px border border-line bg-line sm:grid-cols-2">
+				<ul className="mt-14 grid gap-4 sm:grid-cols-2">
 					{projects.map((p) => (
-						<li key={p._id} className="bg-void">
+						<li key={p._id}>
 							<Link
 								href={`/projects/${p.slug}`}
-								className="group flex h-full flex-col gap-4 p-6 transition-colors hover:bg-deep sm:p-8"
+								className="group flex h-full flex-col gap-4 border border-line-strong bg-void/80 p-6 transition-colors hover:border-cyan-dim hover:bg-deep sm:p-8"
 							>
 								<span className="flex items-baseline justify-between gap-4">
-									<span className="font-display text-lg leading-snug text-ice transition-colors group-hover:text-cyan">
+									<span className="font-crt text-[26px] uppercase leading-[1.1] tracking-[0.03em] text-ice transition-colors group-hover:text-cyan">
 										{p.title}
 									</span>
-									{p.year && <span className="text-[12px] text-dim">{p.year}</span>}
+									{p.year && <span className="font-crt text-[18px] text-dim">{p.year}</span>}
 								</span>
-								<span className="font-prose leading-relaxed text-fog">{p.summary}</span>
-								<span className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2 text-[12px] text-cyan-dim">
+								<span className="font-prose text-[15px] leading-relaxed text-fog">{p.summary}</span>
+								<span className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2 font-crt text-[17px] uppercase tracking-[0.06em] text-cyan-dim">
 									{p.stack.map((s) => (
 										<span key={s}>{s}</span>
 									))}

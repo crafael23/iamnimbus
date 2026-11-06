@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import { SiteNav } from "./SiteNav";
 
-/** Long-form surfaces: calm wall grid, no floor, readable column. */
+/** Long-form surfaces: the same tube, a calmer screen, a readable column. */
 export function PageShell({ children }: { children: ReactNode }) {
 	return (
 		<div className="relative min-h-[100dvh] bg-void">
-			<div aria-hidden className="grid-wall" />
+			<div aria-hidden className="crt-glass" />
 			<SiteNav />
-			<main className="relative z-10 mx-auto max-w-[1100px] px-4 pb-24 pt-12 sm:px-6 sm:pt-20">
+			<main className="screen-in crt-text relative z-10 mx-auto max-w-[1100px] px-5 pb-28 pt-12 sm:px-8 sm:pt-20">
 				{children}
 			</main>
 		</div>

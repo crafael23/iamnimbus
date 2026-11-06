@@ -55,6 +55,7 @@ export function Terminal() {
 	const [cleared, setCleared] = useState(0);
 	const [gateCode, setGateCode] = useState<string | null>(null);
 	const [linkFailed, setLinkFailed] = useState(false);
+	const [degauss, setDegauss] = useState(false);
 	/**
 	 * The guest token reads subscribe with. Kept for the page's life (the
 	 * server accepts it for reads after expiry); writes fetch a current one.
@@ -209,6 +210,7 @@ export function Terminal() {
 			if (threadId) saveClearedAt(threadId, count);
 			setCleared(count);
 			setLines([]);
+			setDegauss(true);
 			return;
 		}
 		if (command?.startsWith("/") && !COMMANDS.some((c) => c.name === command)) {
@@ -281,15 +283,15 @@ export function Terminal() {
 
 	// --- boot --------------------------------------------------------------
 	const bootLines: BootLine[] = [
-		{ label: "handshake", value: "secure" },
-		{ label: "knowledge base", value: "6 sectors online" },
+		{ label: "phosphor", value: "warm" },
+		{ label: "archive", value: "6 sectors indexed" },
 		{ label: "persona", value: "loaded" },
 		{
-			label: "session",
+			label: "link",
 			value:
 				tier === "guest"
-					? `guest link, ${session?.limit ?? 10} transmissions`
-					: `persistent channel, ${session?.limit ?? 30}/day`,
+					? `guest · ${session?.limit ?? 10} transmissions`
+					: `persistent · ${session?.limit ?? 30}/day`,
 		},
 	];
 	const finishBoot = useCallback(() => {
@@ -300,12 +302,13 @@ export function Terminal() {
 
 	const status = session ? (
 		<span
-			className={`hidden whitespace-nowrap text-[12px] sm:inline ${
-				session.remaining <= 3 ? "text-amber" : "text-dim"
+			className={`hidden whitespace-nowrap sm:inline ${
+				session.remaining <= 3 ? "glow-amber" : "text-dim"
 			}`}
 			title="Messages used in this session"
 		>
-			{tier === "guest" ? "guest link" : "channel"} {session.used}/{session.limit}
+			{tier === "guest" ? "link" : "channel"} {String(session.used).padStart(2, "0")}/
+			{session.limit}
 		</span>
 	) : null;
 
@@ -313,14 +316,18 @@ export function Terminal() {
 		lines.filter((l) => l.after === count);
 
 	return (
-		<div className="relative flex h-[100dvh] flex-col overflow-hidden bg-void">
-			<div aria-hidden className="grid-wall" />
-			<div
-				aria-hidden
-				className={`grid-floor ${replying ? "is-live" : ""} ${
-					visibleMessages.length > 0 ? "is-dim" : ""
-				}`}
-			/>
+		<div
+			className={`relative flex h-[100dvh] flex-col overflow-hidden bg-void font-crt ${
+				degauss ? "degauss" : ""
+			}`}
+			onAnimationEnd={(e) => {
+				if (e.target === e.currentTarget) setDegauss(false);
+			}}
+		>
+			<div aria-hidden className={`crt-glass ${replying ? "is-live" : ""}`} />
+			<div aria-hidden className="crt-burn">
+				nimbus
+			</div>
 
 			<SiteNav status={status} />
 
@@ -334,7 +341,7 @@ export function Terminal() {
 					role="log"
 					aria-live="polite"
 					aria-relevant="additions"
-					className="mx-auto max-w-[860px] px-4 pb-10 sm:px-6"
+					className="crt-text mx-auto max-w-[900px] px-5 pb-10 sm:px-8"
 				>
 					{cleared === 0 && (
 						<BootSequence lines={bootLines} instant={booted} onDone={finishBoot} />
@@ -380,12 +387,12 @@ export function Terminal() {
 
 			{bootDone && !gated && (
 				<div className="relative z-10 shrink-0 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 sm:px-6 sm:pb-6">
-					<div className="mx-auto max-w-[860px]">
+					<div className="mx-auto max-w-[900px]">
 						{showSuggestions && (
 							<ul
 								id="command-list"
 								aria-label="Commands"
-								className="mb-2 border border-line bg-deep/95 py-1 text-[13px] backdrop-blur-sm"
+								className="crt-text mb-2 border border-line-strong bg-deep/95 py-1 text-[19px] sm:text-[20px]"
 							>
 								{suggestions.map((c, i) => (
 									<li key={c.name}>
@@ -397,14 +404,16 @@ export function Terminal() {
 												e.preventDefault();
 												void submit(c.name);
 											}}
-											className={`flex w-full gap-4 px-3 py-1.5 text-left ${
-												i === selected ? "bg-cyan/10 text-cyan" : "text-fog"
+											className={`flex w-full gap-4 px-3 py-0.5 text-left ${
+												i === selected ? "reverse" : "text-fog"
 											}`}
 										>
 											<span className="w-[10ch] shrink-0">{c.name}</span>
-											<span className="text-dim">{c.hint}</span>
+											<span className={i === selected ? "" : "text-dim"}>{c.hint}</span>
 											{c.local && (
-												<span className="ml-auto text-dim/70">local</span>
+												<span className={`ml-auto uppercase ${i === selected ? "" : "text-dim/70"}`}>
+													local
+												</span>
 											)}
 										</button>
 									</li>
@@ -416,7 +425,7 @@ export function Terminal() {
 								e.preventDefault();
 								if (!replying) void submit(input);
 							}}
-							className="glow-edge flex items-start gap-[1ch] bg-deep/90 px-3 py-3 backdrop-blur-sm sm:px-4"
+							className="glow-edge crt-text flex items-start gap-[1ch] bg-deep/85 px-3 py-2.5 sm:px-4"
 						>
 							<label htmlFor="prompt" className="shrink-0 select-none pt-[1px] text-cyan glow-text">
 								{"❯"}
@@ -443,14 +452,14 @@ export function Terminal() {
 								aria-describedby={showSuggestions ? "command-list" : undefined}
 								autoComplete="off"
 								spellCheck={false}
-								className="max-h-40 min-h-[1.5em] w-full resize-none bg-transparent text-[16px] leading-[1.5] text-ice caret-cyan outline-none [field-sizing:content] placeholder:text-dim focus-visible:outline-none sm:text-[15px]"
+								className="max-h-40 min-h-[1.3em] w-full resize-none bg-transparent text-[20px] leading-[1.3] text-ice caret-cyan outline-none [caret-shape:block] [field-sizing:content] placeholder:text-dim focus-visible:outline-none sm:text-[22px]"
 							/>
 							<button
 								type="submit"
 								disabled={replying || !threadId || !input.trim()}
-								className="shrink-0 pt-[1px] text-[12px] uppercase tracking-[0.12em] text-cyan transition-opacity disabled:opacity-30"
+								className="shrink-0 text-[18px] uppercase tracking-[0.12em] text-cyan transition-opacity hover:text-ice disabled:opacity-30 sm:text-[20px]"
 							>
-								send
+								[send]
 							</button>
 						</form>
 					</div>
@@ -463,7 +472,7 @@ export function Terminal() {
 function LocalOutput({ line }: { line: LocalLine }) {
 	if (line.kind === "help") {
 		return (
-			<pre className="line-in mt-4 whitespace-pre-wrap text-[13px] leading-relaxed text-fog sm:text-sm">
+			<pre className="line-in mt-5 whitespace-pre-wrap font-crt text-[19px] leading-snug text-fog sm:text-[21px]">
 				<span className="text-cyan">commands</span>
 				{"\n"}
 				{line.text}
@@ -472,7 +481,7 @@ function LocalOutput({ line }: { line: LocalLine }) {
 	}
 	return (
 		<p
-			className={`line-in mt-4 text-[13px] leading-relaxed sm:text-sm ${
+			className={`line-in mt-5 text-[19px] leading-snug sm:text-[21px] ${
 				line.kind === "error" ? "text-danger" : "text-amber"
 			}`}
 		>
@@ -487,32 +496,34 @@ function SessionGate({ reason }: { reason: "session" | "network" }) {
 	return (
 		<section
 			aria-label="Guest session ended"
-			className="line-in mt-10 border border-amber/60 bg-deep/80 p-5 shadow-[0_0_28px_-6px_rgba(240,163,94,0.45),inset_0_0_24px_-10px_rgba(240,163,94,0.35)] sm:p-7"
+			className="line-in mt-10 border border-amber/70 bg-deep/80 shadow-[0_0_32px_-6px_rgba(255,180,84,0.45),inset_0_0_28px_-10px_rgba(255,180,84,0.35)]"
 		>
-			<p className="font-display text-[13px] tracking-[0.06em] glow-amber">
-				guest link closed
+			<p className="reverse-amber flex items-center justify-between px-4 py-1 text-[18px] uppercase tracking-[0.14em] sm:px-6 sm:text-[20px]">
+				<span>link terminated</span>
+				<span aria-hidden className="cursor-blink">{"\u25A0"}</span>
 			</p>
-			<p className="mt-3 max-w-[52ch] text-sm leading-relaxed text-ice">
-				{reason === "network"
-					? "Guest links from this network have used today\u2019s transmissions."
-					: "That was the last of this session\u2019s ten transmissions."}{" "}
-				Sign in to open a persistent channel: a deeper model, thirty messages a
-				day, and a conversation that is still here when you come back.
-			</p>
-			<div className="mt-5 flex flex-wrap items-center gap-4">
-				{/* Route handlers that redirect to WorkOS, not pages. */}
-				{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
-				<a
-					href="/sign-in"
-					className="glow-edge inline-flex items-center gap-2 bg-cyan/10 px-5 py-2.5 text-sm text-cyan transition-transform hover:bg-cyan/15 active:translate-y-px"
-				>
-					sign in
-					<span aria-hidden>{"→"}</span>
-				</a>
-				{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
-				<a href="/sign-up" className="text-sm text-fog underline-offset-4 hover:text-ice hover:underline">
-					create an account
-				</a>
+			<div className="p-5 sm:p-6">
+				<p className="glow-amber max-w-[52ch] text-[19px] leading-snug sm:text-[21px]">
+					{reason === "network"
+						? "Guest links from this network have used today\u2019s transmissions."
+						: "That was the last of this session\u2019s ten transmissions."}{" "}
+					Sign in to open a persistent channel: a deeper model, thirty messages a
+					day, and a conversation that is still here when you come back.
+				</p>
+				<div className="mt-6 flex flex-wrap items-center gap-5 text-[19px] uppercase tracking-[0.1em] sm:text-[21px]">
+					{/* Route handlers that redirect to WorkOS, not pages. */}
+					{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
+					<a
+						href="/sign-in"
+						className="border border-amber px-4 py-1 text-amber shadow-[0_0_18px_-4px_rgba(255,180,84,0.6)] transition-colors hover:bg-amber hover:text-void active:translate-y-px"
+					>
+						[ sign in ]
+					</a>
+					{/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
+					<a href="/sign-up" className="text-fog hover:text-ice">
+						create an account
+					</a>
+				</div>
 			</div>
 		</section>
 	);

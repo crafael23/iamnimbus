@@ -174,7 +174,7 @@ export function PanelHeader({
 	return (
 		<div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
 			<div>
-				<h1 className="font-display text-xl font-light text-ice">{title}</h1>
+				<h1 className="font-display text-xl text-ice">{title}</h1>
 				<p className="mt-2 max-w-[60ch] text-[13px] leading-relaxed text-fog">{description}</p>
 			</div>
 			{action}
