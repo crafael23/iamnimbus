@@ -162,6 +162,26 @@ describe("projects linked to GitHub repos", () => {
 		expect(docs[0]?.content).toContain("Portfolio project: Project one");
 	});
 
+	test("a link saved before keys were normalized is migrated by the next sync", async () => {
+		const t = setup();
+		const admin = await asUser(t, "user_admin", "admin");
+		await t.run(async (ctx) => {
+			await ctx.db.insert("projects", {
+				...project("old"),
+				githubRepo: "owner/Alpha",
+				updatedAt: Date.now(),
+			});
+		});
+		await t.mutation(internal.github.mutations.applySync, { username: "owner", repos: [repo("alpha")] });
+
+		await expect(
+			admin.mutation(api.projects.mutations.save, project("new", "owner/alpha")),
+		).rejects.toThrow(/already linked to “Project old”/);
+		expect((await docFor(t, "github", "owner/alpha"))?.content).toContain("Portfolio project: Project old");
+		const page = await t.query(api.projects.queries.getBySlug, { slug: "old" });
+		expect(page?.githubRepo).toBe("owner/alpha");
+	});
+
 	test("the picker lists synced repos with the project each belongs to", async () => {
 		const t = setup();
 		const admin = await synced(t);

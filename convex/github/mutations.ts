@@ -12,6 +12,13 @@ export const applySync = internalMutation({
 	args: { username: v.string(), repos: v.array(vSyncedRepo) },
 	handler: async (ctx, { username, repos }) => {
 		const now = Date.now();
+		// Project links saved before keys were normalized: lowercase them first so
+		// the lookups below (and every later save) see them.
+		for (const project of await ctx.db.query("projects").collect()) {
+			if (project.githubRepo && project.githubRepo !== repoKey(project.githubRepo)) {
+				await ctx.db.patch(project._id, { githubRepo: repoKey(project.githubRepo) });
+			}
+		}
 		// Rows and docs from before keys were normalized drop out below and are
 		// recreated under their lowercase key.
 		const keep = new Set(repos.map((r) => repoKey(r.fullName)));
