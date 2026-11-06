@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ProfileLinks } from "@/components/ProfileLinks";
 
 export type BootLine = { label: string; value: string };
 
@@ -26,8 +27,8 @@ export function BootSequence({
 	instant: boolean;
 	onDone: () => void;
 }) {
-	// wordmark, each line, the whisper, the hint
-	const total = lines.length + 3;
+	// wordmark, each line, the profiles, the whisper, the hint
+	const total = lines.length + 4;
 	const [shown, setShown] = useState(instant ? total : 0);
 	const [powering, setPowering] = useState(!instant);
 	const done = shown >= total;
@@ -93,8 +94,16 @@ export function BootSequence({
 						</dd>
 					</div>
 				))}
+				{shown >= lines.length + 2 && (
+					<>
+						<dt className={`${animate ? "line-in" : ""} text-dim`}>elsewhere</dt>
+						<dd className={animate ? "line-in" : ""}>
+							<ProfileLinks />
+						</dd>
+					</>
+				)}
 			</dl>
-			{shown >= lines.length + 2 && (
+			{shown >= lines.length + 3 && (
 				<p
 					className={`${animate ? "line-in" : ""} mt-8 text-[19px] text-cyan-dim sm:text-[21px]`}
 				>

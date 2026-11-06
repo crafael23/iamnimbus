@@ -1,3 +1,5 @@
+import { profileLinksSection } from "./profile";
+
 /**
  * Prompt pieces that are code, not content. The persona itself lives in the
  * `systemPromptVersions` table and is edited from the admin.
@@ -28,7 +30,7 @@ export const SLASH_COMMANDS = {
 	"/resume":
 		"The visitor ran /resume. Search history and skills, then give a structured résumé: a one-line headline, experience, core skills, and selected work. Only include what the knowledge base supports; mark missing sections as not yet on record.",
 	"/contact":
-		"The visitor ran /contact. Search history and goals for contact details and availability. List only contact channels that are on record. If none are recorded, say so and point them to sign in so the conversation is kept.",
+		"The visitor ran /contact. Give the owner's public profiles from the system prompt as Markdown links, then search history and goals for any other contact details and availability. List only channels that are on record.",
 	"/about":
 		"The visitor ran /about. Search history and goals, then give a short first-person introduction: who the owner is, what they build, what they are aiming for. Keep it under 150 words.",
 	"/blog":
@@ -82,6 +84,7 @@ export function buildSystemPrompt(parts: {
 	const sections = [
 		parts.persona.trim(),
 		OPERATING_RULES,
+		profileLinksSection(),
 		`## This turn\n${tierInstruction(parts.tier, parts.used, parts.limit, parts.noticeAt)}`,
 	];
 	const command = slashCommandInstruction(parts.prompt);

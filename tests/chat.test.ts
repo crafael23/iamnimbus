@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../convex/_generated/api";
 import { MODELS } from "../convex/chat/agent";
 import { buildSystemPrompt, slashCommandInstruction, tierInstruction } from "../convex/_lib/persona";
+import { PROFILE_LINKS } from "../convex/_lib/profile";
 import {
 	ACCESS_TTL_MS,
 	hashNetwork,
@@ -349,5 +350,18 @@ describe("prompt assembly", () => {
 		expect(system).toMatch(/searchKnowledge/);
 		expect(system).toMatch(/3 transmissions remain/);
 		expect(system).toMatch(/ran \/about/);
+	});
+
+	test("every turn carries the owner's public profiles; /contact asks for them", () => {
+		const system = buildSystemPrompt({
+			persona: "PERSONA",
+			tier: "guest",
+			used: 1,
+			limit: 10,
+			noticeAt: 7,
+			prompt: "hello",
+		});
+		for (const link of PROFILE_LINKS) expect(system).toContain(link.href);
+		expect(slashCommandInstruction("/contact")).toMatch(/public profiles/);
 	});
 });

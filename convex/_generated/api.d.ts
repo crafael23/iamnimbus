@@ -15,6 +15,7 @@ import type * as _lib_guestToken from "../_lib/guestToken.js";
 import type * as _lib_knowledge from "../_lib/knowledge.js";
 import type * as _lib_namespaces from "../_lib/namespaces.js";
 import type * as _lib_persona from "../_lib/persona.js";
+import type * as _lib_profile from "../_lib/profile.js";
 import type * as _lib_rag from "../_lib/rag.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
 import type * as _lib_slug from "../_lib/slug.js";
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/knowledge": typeof _lib_knowledge;
   "_lib/namespaces": typeof _lib_namespaces;
   "_lib/persona": typeof _lib_persona;
+  "_lib/profile": typeof _lib_profile;
   "_lib/rag": typeof _lib_rag;
   "_lib/rateLimits": typeof _lib_rateLimits;
   "_lib/slug": typeof _lib_slug;
