@@ -1,6 +1,7 @@
 "use client";
 
 import { useSmoothText, type UIMessage } from "@convex-dev/agent/react";
+import { useState } from "react";
 import { Markdown } from "@/components/Markdown";
 
 const TEXT = "text-[19px] sm:text-[21px]";
@@ -30,8 +31,13 @@ export function ProgramReply({
 	isLatest: boolean;
 }) {
 	const streaming = message.status === "streaming" || message.status === "pending";
+	// Replies arrive whole once the safety check passes; type out the ones that
+	// land while the visitor is here (older ones on reload appear at once).
+	const [fresh] = useState(
+		() => isLatest && Date.now() - message._creationTime < 30_000,
+	);
 	const [visible, { isStreaming }] = useSmoothText(message.text, {
-		startStreaming: streaming,
+		startStreaming: streaming || fresh,
 	});
 	const typing = streaming || isStreaming;
 	const failed = message.status === "failed";

@@ -2,6 +2,7 @@ import { createThread, saveMessage } from "@convex-dev/agent";
 import { ConvexError, v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { mutation } from "../_generated/server";
+import { assertBudget } from "../_lib/billing";
 import { GUEST_NOTICE_AT, rateLimiter } from "../_lib/rateLimits";
 import {
 	authorizeThreadAccess,
@@ -71,6 +72,8 @@ export const sendMessage = mutation({
 		}
 		const owner = await resolveChatOwner(ctx, guestToken, "write");
 		await authorizeThreadAccess(ctx, threadId, owner);
+		// The dollar ceiling comes first: no tokens are spent once it is reached.
+		await assertBudget(ctx);
 
 		const limitName =
 			owner.tier === "guest" ? "guestMessages" : "registeredMessages";
@@ -82,6 +85,13 @@ export const sendMessage = mutation({
 				code: owner.tier === "guest" ? "GUEST_LIMIT" : "DAILY_LIMIT",
 				retryAfter: status.retryAfter,
 			});
+		}
+		if (owner.tier === "registered") {
+			// Throwing rolls back the per-user token taken above.
+			const shared = await rateLimiter.limit(ctx, "registeredGlobal");
+			if (!shared.ok) {
+				throw new ConvexError({ code: "CAPACITY", retryAfter: shared.retryAfter });
+			}
 		}
 		if (owner.network) {
 			// Throwing rolls back every token taken above, so a rejected

@@ -19,6 +19,9 @@ export const GUEST_NETWORK_DAILY_LIMIT = 30;
  *   /64) per rolling day, so clearing cookies does not reset the allowance.
  *   Generous because offices and mobile carriers share addresses.
  * - guestNetworkThreads: caps new guest threads per network.
+ * - registeredGlobal: generous shared cap across all signed-in users, so new
+ *   accounts cannot multiply the per-user allowance without bound. The
+ *   dollar budget (_lib/billing.ts) is the hard ceiling either way.
  * - guestGlobal: backstop across all guests so rotating session ids cannot
  *   drain gateway credits.
  * - threadCreate: caps thread creation per owner.
@@ -47,6 +50,13 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
 		rate: 30,
 		period: HOUR,
 		capacity: 30,
+	},
+	registeredGlobal: {
+		kind: "token bucket",
+		rate: 500,
+		period: DAY,
+		capacity: 500,
+		shards: 4,
 	},
 	guestGlobal: {
 		kind: "token bucket",

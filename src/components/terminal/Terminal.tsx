@@ -255,7 +255,18 @@ export function Terminal() {
 			} else if (code === "CAPACITY") {
 				print(
 					"notice",
-					"The grid is at capacity for guest links right now. Sign in, or try again in a few minutes.",
+					tier === "guest"
+						? "The grid is at capacity for guest links right now. Sign in, or try again in a few minutes."
+						: "The grid is at capacity right now. Try again a little later.",
+				);
+			} else if (code === "BUDGET") {
+				const scope = (error as ConvexError<{ scope?: string }>).data.scope;
+				setInput(text);
+				print(
+					"notice",
+					scope === "day"
+						? "The terminal has used today's power budget and is resting until tomorrow (UTC). Projects and writing are still open."
+						: "The terminal has used this month's power budget and is resting until the 1st. Projects and writing are still open.",
 				);
 			} else if (code === "TOO_LONG") {
 				setInput(text);

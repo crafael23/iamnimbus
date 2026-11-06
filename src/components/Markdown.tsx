@@ -22,6 +22,16 @@ const components: Components = {
 		) : null,
 };
 
+/**
+ * Terminal replies are model output, so they never load remote images: an
+ * image URL can carry the conversation to a third party just by rendering
+ * (a prompt-injection exfiltration channel). Prose is owner-written and keeps them.
+ */
+const terminalComponents: Components = {
+	...components,
+	img: ({ alt }) => (alt ? <span className="text-dim">[image: {alt}]</span> : null),
+};
+
 /** Markdown in the system's two registers: terminal replies and long-form prose. */
 export function Markdown({
 	children,
@@ -38,7 +48,10 @@ export function Markdown({
 			className={variant === "terminal" ? "term-md" : "prose-grid"}
 			data-cursor={cursor}
 		>
-			<ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+			<ReactMarkdown
+				remarkPlugins={[remarkGfm]}
+				components={variant === "terminal" ? terminalComponents : components}
+			>
 				{children}
 			</ReactMarkdown>
 		</div>

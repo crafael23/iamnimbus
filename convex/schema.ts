@@ -112,6 +112,17 @@ export default defineSchema({
 		restoredFrom: v.optional(v.id("systemPromptVersions")),
 	}),
 
+	/**
+	 * AI spend in US dollars, one row per month ("2026-11") and per day
+	 * ("2026-11-05"), UTC. Written after every model or judge call; read by
+	 * sendMessage to enforce the budget.
+	 */
+	aiSpend: defineTable({
+		period: v.string(),
+		costUsd: v.number(),
+		calls: v.number(),
+	}).index("by_period", ["period"]),
+
 	githubSyncRuns: defineTable({
 		username: v.string(),
 		status: v.union(v.literal("ok"), v.literal("error")),

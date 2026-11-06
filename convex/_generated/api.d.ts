@@ -9,6 +9,7 @@
  */
 
 import type * as _lib_auth from "../_lib/auth.js";
+import type * as _lib_billing from "../_lib/billing.js";
 import type * as _lib_customFunctions from "../_lib/customFunctions.js";
 import type * as _lib_github from "../_lib/github.js";
 import type * as _lib_guestToken from "../_lib/guestToken.js";
@@ -18,9 +19,11 @@ import type * as _lib_persona from "../_lib/persona.js";
 import type * as _lib_profile from "../_lib/profile.js";
 import type * as _lib_rag from "../_lib/rag.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
+import type * as _lib_safety from "../_lib/safety.js";
 import type * as _lib_slug from "../_lib/slug.js";
 import type * as auth from "../auth.js";
 import type * as authInternal from "../authInternal.js";
+import type * as billing_internal from "../billing/internal.js";
 import type * as blog_mutations from "../blog/mutations.js";
 import type * as blog_queries from "../blog/queries.js";
 import type * as chat_actions from "../chat/actions.js";
@@ -51,6 +54,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "_lib/auth": typeof _lib_auth;
+  "_lib/billing": typeof _lib_billing;
   "_lib/customFunctions": typeof _lib_customFunctions;
   "_lib/github": typeof _lib_github;
   "_lib/guestToken": typeof _lib_guestToken;
@@ -60,9 +64,11 @@ declare const fullApi: ApiFromModules<{
   "_lib/profile": typeof _lib_profile;
   "_lib/rag": typeof _lib_rag;
   "_lib/rateLimits": typeof _lib_rateLimits;
+  "_lib/safety": typeof _lib_safety;
   "_lib/slug": typeof _lib_slug;
   auth: typeof auth;
   authInternal: typeof authInternal;
+  "billing/internal": typeof billing_internal;
   "blog/mutations": typeof blog_mutations;
   "blog/queries": typeof blog_queries;
   "chat/actions": typeof chat_actions;

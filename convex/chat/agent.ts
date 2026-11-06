@@ -2,6 +2,7 @@ import { Agent, createTool, stepCountIs } from "@convex-dev/agent";
 import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { z } from "zod";
 import { components, internal } from "../_generated/api";
+import { costOf } from "../_lib/billing";
 import { PLACEHOLDER_PERSONA, type Tier } from "../_lib/persona";
 import { NAMESPACES, searchKnowledgeBase } from "../_lib/rag";
 
@@ -59,6 +60,16 @@ function makeAgent(tier: Tier) {
 		stopWhen: stepCountIs(4),
 		callSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS[tier] },
 		contextOptions: { recentMessages: tier === "guest" ? 20 : 40 },
+		// Every step's cost counts against the monthly and daily AI budget.
+		usageHandler: async (ctx, { model, usage, providerMetadata }) => {
+			await ctx.runMutation(internal.billing.internal.record, {
+				costUsd: costOf(
+					model,
+					usage as Parameters<typeof costOf>[1],
+					providerMetadata as Parameters<typeof costOf>[2],
+				),
+			});
+		},
 	});
 }
 
