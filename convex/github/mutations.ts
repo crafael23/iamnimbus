@@ -1,41 +1,48 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-import { removeDerivedDoc, upsertDerivedDoc } from "../_lib/knowledge";
+import { findRepo, refreshRepoDoc, vSyncedRepo } from "../_lib/github";
+import { removeDerivedDoc } from "../_lib/knowledge";
 
+/**
+ * Replace the synced repo set. Rows and knowledge docs for repos that are gone
+ * are removed; a project linked to one keeps its link (a later sync may bring
+ * the repo back) but shows no repo details until then.
+ */
 export const applySync = internalMutation({
-	args: {
-		username: v.string(),
-		repos: v.array(
-			v.object({ fullName: v.string(), title: v.string(), content: v.string() }),
-		),
-	},
+	args: { username: v.string(), repos: v.array(vSyncedRepo) },
 	handler: async (ctx, { username, repos }) => {
+		const now = Date.now();
 		const keep = new Set(repos.map((r) => r.fullName));
 		for (const repo of repos) {
-			await upsertDerivedDoc(ctx, {
-				namespace: "github",
-				source: "github",
-				sourceKey: repo.fullName,
-				title: repo.title,
-				content: repo.content,
-			});
+			const existing = await findRepo(ctx, repo.fullName);
+			if (existing) {
+				await ctx.db.replace(existing._id, { ...repo, syncedAt: now });
+			} else {
+				await ctx.db.insert("githubRepos", { ...repo, syncedAt: now });
+			}
+			await refreshRepoDoc(ctx, repo.fullName);
 		}
-		const existing = await ctx.db
+
+		let removed = 0;
+		for (const row of await ctx.db.query("githubRepos").collect()) {
+			if (!keep.has(row.fullName)) await ctx.db.delete(row._id);
+		}
+		const docs = await ctx.db
 			.query("knowledgeDocs")
 			.withIndex("by_source", (q) => q.eq("source", "github"))
 			.collect();
-		let removed = 0;
-		for (const doc of existing) {
+		for (const doc of docs) {
 			if (doc.sourceKey && !keep.has(doc.sourceKey)) {
 				await removeDerivedDoc(ctx, "github", doc.sourceKey);
 				removed++;
 			}
 		}
+
 		await ctx.db.insert("githubSyncRuns", {
 			username,
 			status: "ok",
 			repoCount: repos.length,
-			finishedAt: Date.now(),
+			finishedAt: now,
 		});
 		return { synced: repos.length, removed };
 	},

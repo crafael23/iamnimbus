@@ -98,6 +98,7 @@ const ADMIN_CALLS = {
 	"prompts.mutations.restore": (c: Caller, f: Fixture) =>
 		c.mutation(api.prompts.mutations.restore, { versionId: f.versionId }),
 	"github.queries.lastRun": (c: Caller) => c.query(api.github.queries.lastRun, {}),
+	"github.queries.repos": (c: Caller) => c.query(api.github.queries.repos, {}),
 	"github.actions.sync": (c: Caller) => c.action(api.github.actions.sync, {}),
 	"users.queries.listUsersAdminOnly": (c: Caller) => c.query(api.users.queries.listUsersAdminOnly, {}),
 } as const;

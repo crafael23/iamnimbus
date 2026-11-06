@@ -86,6 +86,7 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 		outcome: project?.outcome ?? "",
 		stack: project?.stack.join(", ") ?? "",
 		year: project?.year ?? "",
+		githubRepo: project?.githubRepo ?? "",
 		repoUrl: project?.repoUrl ?? "",
 		liveUrl: project?.liveUrl ?? "",
 		order: project?.order ?? 0,
@@ -95,6 +96,9 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 	const [error, setError] = useState<string | null>(null);
 	const save = useMutation(api.projects.mutations.save);
 	const remove = useMutation(api.projects.mutations.remove);
+	const repos = useQuery(api.github.queries.repos);
+	const takenBy = (r: NonNullable<typeof repos>[number]) =>
+		r.linkedProject && r.linkedProject._id !== project?._id ? r.linkedProject.title : null;
 	const index = useQuery(
 		api.knowledge.queries.statusForSource,
 		project ? { source: "project", sourceKey: project._id } : "skip",
@@ -109,7 +113,8 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 				...form,
 				stack: form.stack.split(","),
 				year: form.year.trim() || undefined,
-				repoUrl: form.repoUrl.trim() || undefined,
+				githubRepo: form.githubRepo || undefined,
+				repoUrl: form.githubRepo ? undefined : form.repoUrl.trim() || undefined,
 				liveUrl: form.liveUrl.trim() || undefined,
 				order: Number(form.order) || 0,
 			});
@@ -175,12 +180,43 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 					</Field>
 				</div>
 				<div className="grid gap-5 sm:grid-cols-2">
-					<Field label="Repository URL" htmlFor="p-repo">
-						<input id="p-repo" value={form.repoUrl} onChange={(e) => set("repoUrl")(e.target.value)} placeholder="https://" className={inputClass} />
+					<Field
+						label="GitHub repository"
+						htmlFor="p-github"
+						hint={
+							repos === undefined
+								? "Loading synced repositories…"
+								: repos.length === 0
+									? "Run a GitHub sync to choose a repository."
+									: "One repository per project. Its details show on the project page."
+						}
+					>
+						<select
+							id="p-github"
+							value={form.githubRepo}
+							onChange={(e) => set("githubRepo")(e.target.value)}
+							className={inputClass}
+						>
+							<option value="">None</option>
+							{repos?.map((r) => (
+								<option key={r.fullName} value={r.fullName} disabled={Boolean(takenBy(r))}>
+									{r.fullName}
+									{takenBy(r) ? ` (linked to ${takenBy(r)})` : ""}
+								</option>
+							))}
+							{form.githubRepo && repos && !repos.some((r) => r.fullName === form.githubRepo) && (
+								<option value={form.githubRepo}>{form.githubRepo} (not in the last sync)</option>
+							)}
+						</select>
 					</Field>
 					<Field label="Live URL" htmlFor="p-live">
 						<input id="p-live" value={form.liveUrl} onChange={(e) => set("liveUrl")(e.target.value)} placeholder="https://" className={inputClass} />
 					</Field>
+					{!form.githubRepo && (
+						<Field label="Other repository URL" htmlFor="p-repo" hint="For code that is not in your GitHub sync.">
+							<input id="p-repo" value={form.repoUrl} onChange={(e) => set("repoUrl")(e.target.value)} placeholder="https://" className={inputClass} />
+						</Field>
+					)}
 				</div>
 				{LONG_FIELDS.map(([key, label, hint]) => (
 					<Field key={key} label={label} htmlFor={`p-${key}`} hint={hint}>

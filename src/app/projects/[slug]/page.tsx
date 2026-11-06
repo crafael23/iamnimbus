@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Markdown } from "@/components/Markdown";
-import { PageShell } from "@/components/PageShell";
+import { formatDate, PageShell } from "@/components/PageShell";
 import { api } from "../../../../convex/_generated/api";
 
 export const dynamic = "force-dynamic";
@@ -73,12 +73,45 @@ export default async function ProjectPage({ params }: Props) {
 								))}
 							</dd>
 						</div>
-						{(project.repoUrl || project.liveUrl) && (
+						{project.repo && (
+							<div>
+								<dt className="uppercase tracking-[0.1em] text-dim">github</dt>
+								<dd className="mt-1 space-y-1">
+									<a
+										href={project.repo.url}
+										target="_blank"
+										rel="noreferrer noopener"
+										className="block break-all text-cyan hover:text-ice"
+									>
+										{project.repo.fullName} ↗
+									</a>
+									{project.repo.languages.length > 0 && (
+										<p className="text-fog">
+											{project.repo.languages
+												.slice(0, 3)
+												.map((l) => `${l.name} ${l.percent}%`)
+												.join(" · ")}
+										</p>
+									)}
+									<p className="text-dim">
+										last push {formatDate(project.repo.pushedAt)}
+										{project.repo.stars > 0 && ` · ★ ${project.repo.stars}`}
+										{project.repo.archived && " · archived"}
+									</p>
+								</dd>
+							</div>
+						)}
+						{((!project.repo && (project.githubRepo || project.repoUrl)) || project.liveUrl) && (
 							<div>
 								<dt className="uppercase tracking-[0.1em] text-dim">links</dt>
 								<dd className="mt-1 space-y-1">
-									{project.repoUrl && (
-										<a href={project.repoUrl} target="_blank" rel="noreferrer noopener" className="block text-cyan hover:text-ice">
+									{!project.repo && (project.githubRepo || project.repoUrl) && (
+										<a
+											href={project.githubRepo ? `https://github.com/${project.githubRepo}` : project.repoUrl}
+											target="_blank"
+											rel="noreferrer noopener"
+											className="block text-cyan hover:text-ice"
+										>
 											repository ↗
 										</a>
 									)}

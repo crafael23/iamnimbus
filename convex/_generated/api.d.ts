@@ -10,6 +10,7 @@
 
 import type * as _lib_auth from "../_lib/auth.js";
 import type * as _lib_customFunctions from "../_lib/customFunctions.js";
+import type * as _lib_github from "../_lib/github.js";
 import type * as _lib_guestToken from "../_lib/guestToken.js";
 import type * as _lib_knowledge from "../_lib/knowledge.js";
 import type * as _lib_namespaces from "../_lib/namespaces.js";
@@ -50,6 +51,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "_lib/auth": typeof _lib_auth;
   "_lib/customFunctions": typeof _lib_customFunctions;
+  "_lib/github": typeof _lib_github;
   "_lib/guestToken": typeof _lib_guestToken;
   "_lib/knowledge": typeof _lib_knowledge;
   "_lib/namespaces": typeof _lib_namespaces;

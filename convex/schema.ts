@@ -73,13 +73,36 @@ export default defineSchema({
 		decisions: v.string(),
 		outcome: v.string(),
 		year: v.optional(v.string()),
+		/** A synced repo's `owner/name`; at most one project per repo. */
+		githubRepo: v.optional(v.string()),
+		/** Repository link for repos outside the sync; unused when githubRepo is set. */
 		repoUrl: v.optional(v.string()),
 		liveUrl: v.optional(v.string()),
 		order: v.number(),
 		updatedAt: v.number(),
 	})
 		.index("by_slug", ["slug"])
-		.index("by_order", ["order"]),
+		.index("by_order", ["order"])
+		.index("by_githubRepo", ["githubRepo"]),
+
+	/** One row per repo in the last GitHub sync, replaced on every sync. */
+	githubRepos: defineTable({
+		fullName: v.string(),
+		name: v.string(),
+		url: v.string(),
+		description: v.optional(v.string()),
+		homepage: v.optional(v.string()),
+		/** Share of code by language, largest first, in whole percent. */
+		languages: v.array(v.object({ name: v.string(), percent: v.number() })),
+		topics: v.array(v.string()),
+		stars: v.number(),
+		forks: v.number(),
+		archived: v.boolean(),
+		createdAt: v.number(),
+		pushedAt: v.number(),
+		readme: v.optional(v.string()),
+		syncedAt: v.number(),
+	}).index("by_fullName", ["fullName"]),
 
 	/** Append-only. The newest version is the active prompt. */
 	systemPromptVersions: defineTable({

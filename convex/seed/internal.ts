@@ -1,4 +1,5 @@
 import { internalMutation } from "../_generated/server";
+import { refreshRepoDoc } from "../_lib/github";
 import { removeDerivedDoc, upsertDerivedDoc } from "../_lib/knowledge";
 import { PLACEHOLDER_PERSONA } from "../_lib/persona";
 
@@ -120,6 +121,7 @@ export const clear = internalMutation({
 			if (p.slug.startsWith("sample-")) {
 				await ctx.db.delete(p._id);
 				await removeDerivedDoc(ctx, "project", p._id);
+				if (p.githubRepo) await refreshRepoDoc(ctx, p.githubRepo);
 				removed.push(p.slug);
 			}
 		}

@@ -59,35 +59,20 @@ async function getReadme(fullName: string): Promise<string | null> {
 		: text;
 }
 
-export function repoDocument(
-	repo: GithubRepo,
-	languages: Record<string, number>,
-	readme: string | null,
-) {
+/** Each language's share of the code, largest first, in whole percent. */
+function languageShares(languages: Record<string, number>) {
 	const total = Object.values(languages).reduce((a, b) => a + b, 0);
-	const languageLine = Object.entries(languages)
+	if (!total) return [];
+	return Object.entries(languages)
 		.sort((a, b) => b[1] - a[1])
-		.map(([lang, bytes]) => `${lang} ${Math.round((bytes / total) * 100)}%`)
-		.join(", ");
-	const lines = [
-		`GitHub repository ${repo.full_name}`,
-		repo.description ?? "No description.",
-		`URL: ${repo.html_url}`,
-		repo.homepage ? `Homepage: ${repo.homepage}` : null,
-		`Languages: ${languageLine || repo.language || "unknown"}`,
-		repo.topics?.length ? `Topics: ${repo.topics.join(", ")}` : null,
-		`Stars: ${repo.stargazers_count}. Forks: ${repo.forks_count}.`,
-		`Created ${repo.created_at.slice(0, 10)}, last pushed ${repo.pushed_at.slice(0, 10)}.`,
-		repo.archived ? "Archived." : null,
-		readme ? `## README\n${readme}` : "No README.",
-	];
-	return lines.filter(Boolean).join("\n");
+		.map(([name, bytes]) => ({ name, percent: Math.round((bytes / total) * 100) }))
+		.filter((l) => l.percent > 0);
 }
 
 /**
- * Pull the owner's public, non-fork repos and upsert one `github` knowledge
- * doc per repo. Repos that disappeared are removed. Idempotent: unchanged
- * repos are not re-embedded.
+ * Pull the owner's public, non-fork repos into `githubRepos` and one `github`
+ * knowledge doc per repo. Repos that disappeared are removed. Idempotent:
+ * unchanged repos are not re-embedded.
  */
 export const sync = adminAction({
 	args: {},
@@ -102,21 +87,36 @@ export const sync = adminAction({
 			)
 				.filter((r) => !r.fork)
 				.slice(0, MAX_REPOS);
-			const docs = [];
+			const synced = [];
 			for (const repo of repos) {
 				const [languages, readme] = await Promise.all([
 					getJson<Record<string, number>>(repo.languages_url),
 					getReadme(repo.full_name),
 				]);
-				docs.push({
+				const shares = languageShares(languages);
+				synced.push({
 					fullName: repo.full_name,
-					title: `${repo.name} (GitHub)`,
-					content: repoDocument(repo, languages, readme),
+					name: repo.name,
+					url: repo.html_url,
+					description: repo.description ?? undefined,
+					homepage: repo.homepage || undefined,
+					languages: shares.length
+						? shares
+						: repo.language
+							? [{ name: repo.language, percent: 100 }]
+							: [],
+					topics: repo.topics ?? [],
+					stars: repo.stargazers_count,
+					forks: repo.forks_count,
+					archived: repo.archived,
+					createdAt: Date.parse(repo.created_at),
+					pushedAt: Date.parse(repo.pushed_at),
+					readme: readme ?? undefined,
 				});
 			}
 			return await ctx.runMutation(internal.github.mutations.applySync, {
 				username,
-				repos: docs,
+				repos: synced,
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
