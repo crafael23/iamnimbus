@@ -103,6 +103,7 @@ export function CrtScreen({ children }: { children: ReactNode }) {
 				className="crt-screen"
 				style={curved ? { filter: "url(#crt-curve)" } : undefined}
 			>
+				<div aria-hidden className="crt-grid" data-quiet={quiet || undefined} />
 				<div ref={scroller} className="crt-scroll">
 					{children}
 				</div>

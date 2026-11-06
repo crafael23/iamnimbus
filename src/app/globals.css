@@ -1,24 +1,25 @@
 @import "tailwindcss";
 
 /*
- * Phosphor tokens. One theme, locked: a monochrome CRT left running in a dark
- * room. The "cyan" family is the phosphor (the system speaking); amber is
- * reserved for the visitor's own input and for alarms. Token names are kept
+ * Phosphor tokens. One theme, locked: a CRT left running in a dark room,
+ * tuned to the grid's electric blue. The "cyan" family is the phosphor (the
+ * system speaking); amber, a grid orange, is reserved for the visitor's own
+ * input and for alarms. Token names are kept
  * from the first design so every surface retones from here.
  */
 @theme {
-	--color-void: #020607;
-	--color-deep: #04100f;
-	--color-panel: #061614;
-	--color-line: #123330;
-	--color-line-strong: #1f4f49;
-	--color-cyan: #7df9e0;
-	--color-cyan-dim: #3a9c8b;
-	--color-ice: #c4f8ec;
-	--color-fog: #82b8ab;
-	--color-dim: #4f7d73;
-	--color-amber: #ffb454;
-	--color-amber-dim: #a8742f;
+	--color-void: #01050a;
+	--color-deep: #030b14;
+	--color-panel: #06121f;
+	--color-line: #0f2639;
+	--color-line-strong: #1c4563;
+	--color-cyan: #5ee2ff;
+	--color-cyan-dim: #2b88b3;
+	--color-ice: #cff1ff;
+	--color-fog: #88b2c8;
+	--color-dim: #4e7389;
+	--color-amber: #ff9d42;
+	--color-amber-dim: #a8611f;
 	--color-danger: #ff6f5e;
 
 	--font-display: var(--nf-display), ui-monospace, monospace;
@@ -349,6 +350,63 @@
 }
 
 /*
+ * The grid: a lit floor running to a horizon, behind every page. Static, so
+ * the curved screen never repaints for it.
+ */
+.crt-grid {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+.crt-grid::before {
+	content: "";
+	position: absolute;
+	/* Deep enough that the far edge reaches the horizon (perspective × cot θ). */
+	left: -150%;
+	right: -150%;
+	bottom: 0;
+	height: 300%;
+	background-image:
+		linear-gradient(
+			to right,
+			color-mix(in oklab, var(--color-cyan) 75%, transparent) 1.5px,
+			transparent 1.5px
+		),
+		linear-gradient(
+			to bottom,
+			color-mix(in oklab, var(--color-cyan) 75%, transparent) 1.5px,
+			transparent 1.5px
+		);
+	background-size: 72px 72px;
+	background-position: center bottom;
+	transform: perspective(600px) rotateX(60deg);
+	transform-origin: 50% 100%;
+	mask-image: linear-gradient(to top, #000 0%, rgb(0 0 0 / 0.6) 8%, transparent 40%);
+	opacity: 0.55;
+}
+/* The horizon's glow, where the floor meets the dark. */
+.crt-grid::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(
+			ellipse 75% 8% at 50% 78%,
+			color-mix(in oklab, var(--color-cyan) 16%, transparent),
+			transparent 70%
+		),
+		radial-gradient(
+			ellipse 90% 40% at 50% 100%,
+			color-mix(in oklab, var(--color-cyan-dim) 14%, transparent),
+			transparent 75%
+		);
+}
+.crt-grid[data-quiet] {
+	display: none;
+}
+
+/*
  * The glass, in one static layer so nothing composites per frame: a soft
  * reflection, a faint center lift, scanlines and the dark falloff of a
  * convex face toward its edges.
@@ -513,12 +571,12 @@
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
-	background: rgb(2 9 9 / 0.94);
+	background: rgb(1 6 12 / 0.94);
 	border: 2px solid color-mix(in oklab, var(--color-ice) 85%, white);
 	box-shadow:
-		0 0 0 1px rgb(196 248 236 / 0.25),
-		0 0 26px rgb(125 249 224 / 0.38),
-		inset 0 0 22px rgb(125 249 224 / 0.12);
+		0 0 0 1px color-mix(in oklab, var(--color-ice) 25%, transparent),
+		0 0 26px color-mix(in oklab, var(--color-cyan) 38%, transparent),
+		inset 0 0 22px color-mix(in oklab, var(--color-cyan) 12%, transparent);
 	color: var(--color-ice);
 	transform-origin: 50% 50%;
 	transition:
@@ -541,7 +599,7 @@
 	color: var(--color-void);
 	font-size: 18px;
 	letter-spacing: 0.08em;
-	box-shadow: 0 0 16px rgb(196 248 236 / 0.45);
+	box-shadow: 0 0 16px color-mix(in oklab, var(--color-ice) 45%, transparent);
 	overflow: hidden;
 	transition:
 		height 0.5s ease,
@@ -653,7 +711,7 @@
 }
 /* VT323 has one weight: emphasis is intensity, as on the real tubes. */
 .term-md strong {
-	color: #f2fffb;
+	color: #f2fbff;
 	font-weight: 400;
 	text-shadow:
 		0 0 2px color-mix(in oklab, var(--color-cyan) 90%, transparent),
@@ -794,7 +852,7 @@
 	font-family: var(--font-prose);
 	font-size: 1rem;
 	line-height: 1.8;
-	color: #b9e9de;
+	color: #bfe3f2;
 	max-width: 68ch;
 }
 .prose-grid > * + * {
@@ -839,7 +897,7 @@
 	text-decoration-color: var(--color-cyan);
 }
 .prose-grid strong {
-	color: #effff9;
+	color: #f0faff;
 	font-weight: 600;
 }
 .prose-grid ul,
