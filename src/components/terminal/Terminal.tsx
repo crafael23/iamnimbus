@@ -16,6 +16,7 @@ import {
 	useState,
 	type KeyboardEvent,
 } from "react";
+import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { api } from "../../../convex/_generated/api";
 import { BootSequence, type BootLine } from "./BootSequence";
@@ -327,7 +328,7 @@ export function Terminal() {
 
 	// --- boot --------------------------------------------------------------
 	const bootLines: BootLine[] = [
-		{ label: "phosphor", value: "warm" },
+		{ label: "phosphor", value: "grid blue" },
 		{ label: "archive", value: "6 sectors indexed" },
 		{
 			label: "link",
@@ -511,6 +512,12 @@ export function Terminal() {
 									send
 								</button>
 							</form>
+							<p className="crt-text mt-2 text-right text-[15px] text-dim sm:text-[16px]">
+								chats are saved ·{" "}
+								<Link href="/privacy" className="underline-offset-4 transition-colors hover:text-cyan hover:underline">
+									privacy
+								</Link>
+							</p>
 						</div>
 					</div>
 				)}

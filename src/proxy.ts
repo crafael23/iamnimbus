@@ -12,6 +12,7 @@ export default authkitMiddleware({
 			"/blog/:path*",
 			"/projects",
 			"/projects/:path*",
+			"/privacy",
 			"/api/guest",
 		],
 	},
