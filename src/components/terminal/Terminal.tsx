@@ -19,6 +19,7 @@ import {
 import { SiteNav } from "@/components/SiteNav";
 import { api } from "../../../convex/_generated/api";
 import { BootSequence, type BootLine } from "./BootSequence";
+import { DustIntro } from "./DustIntro";
 import { COMMANDS, matchCommands } from "./commands";
 import { guestToken } from "./guestToken";
 import { AwaitingReply, ProgramReply, UserLine } from "./Message";
@@ -50,6 +51,10 @@ export function Terminal() {
 	const [threadId, setThreadId] = useState<string | null>(null);
 	const [booted, setBooted] = useState(() => hasBooted() || prefersReducedMotion());
 	const [bootDone, setBootDone] = useState(booted);
+	/** The session's first visit opens on the dusty screen (DustIntro). */
+	const [intro] = useState(() => !booted);
+	const [revealed, setRevealed] = useState(!intro);
+	const reveal = useCallback(() => setRevealed(true), []);
 	const [input, setInput] = useState("");
 	const [selected, setSelected] = useState(0);
 	const [lines, setLines] = useState<LocalLine[]>([]);
@@ -352,6 +357,7 @@ export function Terminal() {
 				if (e.target === e.currentTarget) setDegauss(false);
 			}}
 		>
+			{intro && <DustIntro onReveal={reveal} />}
 			<SiteNav status={status} />
 
 			<div
@@ -367,7 +373,11 @@ export function Terminal() {
 					className="crt-text mx-auto w-full max-w-[860px] px-5 sm:px-10"
 				>
 					{cleared === 0 ? (
-						<BootSequence lines={bootLines} instant={booted} onDone={finishBoot} />
+						<BootSequence
+							lines={bootLines}
+							mode={booted ? "instant" : revealed ? "play" : "held"}
+							onDone={finishBoot}
+						/>
 					) : (
 						<p className="line-in pt-10 text-[19px] text-dim sm:pt-16 sm:text-[21px]">
 							{"// "}screen cleared. The conversation is still in memory.

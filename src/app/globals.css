@@ -85,35 +85,6 @@
 	}
 }
 
-/* Power-on: a beam draws across, opens to a flash, and the flash decays. */
-@keyframes power-beam {
-	0% {
-		opacity: 1;
-		transform: scale(0, 0.004);
-	}
-	22% {
-		opacity: 1;
-		transform: scale(1, 0.004);
-	}
-	42% {
-		opacity: 0.9;
-		transform: scale(1, 1);
-	}
-	100% {
-		opacity: 0;
-		transform: scale(1.08, 1.08);
-	}
-}
-@keyframes power-dark {
-	0%,
-	38% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
 /* The wordmark's phosphor bleeds, then focuses into scanlined glyphs. */
 @keyframes bleed-in {
 	0% {
@@ -191,6 +162,41 @@
 	100% {
 		transform: none;
 		filter: none;
+	}
+}
+
+/* A window lights up overexposed, then settles; and powers down to a line. */
+@keyframes win-on {
+	0% {
+		opacity: 0;
+		transform: scaleY(0.02);
+		filter: brightness(3);
+	}
+	35% {
+		opacity: 1;
+		transform: scaleY(1);
+		filter: brightness(2.2);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+		filter: none;
+	}
+}
+@keyframes win-off {
+	0% {
+		opacity: 1;
+		transform: none;
+		filter: none;
+	}
+	60% {
+		opacity: 1;
+		transform: scaleY(0.01);
+		filter: brightness(2.6);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(0, 0.01);
 	}
 }
 
@@ -376,29 +382,7 @@
 	opacity: 0.55;
 }
 
-/* The power-on overlay for the first boot of a session. */
-.crt-power {
-	position: fixed;
-	inset: 0;
-	z-index: 60;
-	pointer-events: none;
-	background: #000;
-	animation: power-dark 1.15s ease-out forwards;
-}
-.crt-power::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: radial-gradient(
-		ellipse 60% 50% at 50% 50%,
-		#ffffff 0%,
-		color-mix(in oklab, var(--color-cyan) 85%, white) 30%,
-		color-mix(in oklab, var(--color-cyan) 25%, transparent) 62%,
-		transparent 80%
-	);
-	transform: scale(0, 0.004);
-	animation: power-beam 1.15s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
+/* A burst of static when the dormant screen wakes (DustIntro). */
 .crt-static {
 	position: fixed;
 	inset: -20%;
@@ -438,10 +422,221 @@
 	.cursor-settle {
 		animation: none;
 	}
-	.crt-power,
 	.crt-static {
 		display: none;
 	}
+}
+
+/* ------------------------------------------------------------------ */
+/* The dusty screen (DustIntro)                                        */
+/* ------------------------------------------------------------------ */
+
+/* Same box as the tube, under the glass, over everything else. */
+.intro {
+	z-index: 40;
+	transition: opacity 0.45s ease-out;
+}
+.intro-out {
+	opacity: 0;
+	pointer-events: none;
+}
+.intro-tube {
+	position: absolute;
+	inset: 0;
+}
+.intro-clock {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	color: var(--color-ice);
+	font-size: clamp(22px, 2.5vw, 36px);
+	letter-spacing: 0.06em;
+	transition:
+		opacity 0.6s ease-out,
+		filter 0.6s ease-out;
+}
+.intro-clock-out {
+	opacity: 0;
+	filter: brightness(2.4) blur(2px);
+}
+
+/* The dust sits on the glass: flat, over the curved image. */
+.intro-dust {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	transition: opacity 1.2s ease-in;
+}
+.intro-dust-clear {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.intro-hint {
+	position: absolute;
+	inset-inline: 0;
+	bottom: max(env(safe-area-inset-bottom), 28px);
+	display: flex;
+	justify-content: center;
+	align-items: baseline;
+	gap: 2ch;
+	font-size: 17px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: rgb(196 186 168 / 0.62);
+	transition: opacity 0.8s ease;
+	pointer-events: none;
+}
+.intro-hint-off {
+	opacity: 0;
+}
+.intro-hint-off .intro-skip {
+	pointer-events: none;
+}
+.intro-skip {
+	pointer-events: auto;
+	text-transform: inherit;
+	letter-spacing: inherit;
+	color: rgb(220 210 192 / 0.8);
+	text-decoration: underline;
+	text-underline-offset: 4px;
+}
+.intro-skip:hover {
+	color: #fff;
+}
+
+/* Windows: overexposed phosphor frames with reverse-video title bars. */
+.intro-win {
+	position: absolute;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: rgb(2 9 9 / 0.94);
+	border: 2px solid color-mix(in oklab, var(--color-ice) 85%, white);
+	box-shadow:
+		0 0 0 1px rgb(196 248 236 / 0.25),
+		0 0 26px rgb(125 249 224 / 0.38),
+		inset 0 0 22px rgb(125 249 224 / 0.12);
+	color: var(--color-ice);
+	transform-origin: 50% 50%;
+	transition:
+		left 0.7s cubic-bezier(0.7, 0, 0.2, 1),
+		top 0.7s cubic-bezier(0.7, 0, 0.2, 1),
+		width 0.7s cubic-bezier(0.7, 0, 0.2, 1),
+		height 0.7s cubic-bezier(0.7, 0, 0.2, 1),
+		border-color 0.5s ease,
+		box-shadow 0.5s ease,
+		background-color 0.5s ease;
+}
+.intro-titlebar {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: space-between;
+	height: 26px;
+	padding: 0 6px;
+	background: color-mix(in oklab, var(--color-ice) 88%, white);
+	color: var(--color-void);
+	font-size: 18px;
+	letter-spacing: 0.08em;
+	box-shadow: 0 0 16px rgb(196 248 236 / 0.45);
+	overflow: hidden;
+	transition:
+		height 0.5s ease,
+		opacity 0.4s ease;
+}
+.intro-box {
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--color-void);
+}
+.intro-body {
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+	padding: 10px 14px;
+	font-size: clamp(15px, 1.2vw, 19px);
+	line-height: 1.25;
+	transition:
+		padding 0.7s cubic-bezier(0.7, 0, 0.2, 1),
+		font-size 0.7s cubic-bezier(0.7, 0, 0.2, 1);
+}
+.intro-pre {
+	font-family: inherit;
+	white-space: pre;
+}
+.intro-row {
+	background: color-mix(in oklab, var(--color-ice) 85%, white);
+	color: var(--color-void);
+	text-shadow: none;
+}
+
+.intro-win-top {
+	left: 6%;
+	top: 9%;
+	width: 46%;
+	height: 42%;
+}
+.intro-win-archive {
+	left: 9%;
+	top: 47%;
+	width: 36%;
+	height: 30%;
+}
+.intro-win-tty {
+	left: 46%;
+	top: 21%;
+	width: 42%;
+	height: 56%;
+}
+@media (max-width: 767px) {
+	.intro-win-top {
+		left: 5%;
+		top: 6%;
+		width: 90%;
+		height: 30%;
+	}
+	.intro-win-top .intro-body {
+		font-size: 12px;
+	}
+	.intro-win-archive {
+		display: none;
+	}
+	.intro-win-tty {
+		left: 5%;
+		top: 40%;
+		width: 90%;
+		height: 40%;
+	}
+}
+
+/* The session window opens out into the terminal. */
+.intro-win-max {
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	border-color: transparent;
+	box-shadow: none;
+	background-color: var(--color-void);
+}
+.intro-win-max .intro-titlebar {
+	height: 0;
+	opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.intro-win {
+		animation: win-on 0.6s cubic-bezier(0.2, 0.7, 0.1, 1) both;
+	}
+	.intro-win.intro-win-off {
+		animation: win-off 0.45s ease-in both;
+	}
+}
+.intro-win-off {
+	pointer-events: none;
 }
 
 /* ------------------------------------------------------------------ */

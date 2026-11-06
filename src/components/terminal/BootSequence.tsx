@@ -1,83 +1,68 @@
 "use client";
 
 import { type CSSProperties, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { PROFILE_LINKS } from "../../../convex/_lib/profile";
 
 export type BootLine = { label: string; value: string };
 
-const POWER_MS = 1000;
 const WORDMARK_HOLD_MS = 750;
 const STEP_MS = 340;
 
 const chars = (n: number) => ({ "--n": n }) as CSSProperties;
 
 /**
- * The door into the terminal. The tube powers on, the wordmark's phosphor
- * bleeds into focus, and the status lines type out. Any key, click or tap
- * skips ahead. With `instant` (already booted this session, or reduced
- * motion) everything renders at once, without animation.
+ * The door into the terminal, picking up where `whoami` left off: the
+ * wordmark's phosphor bleeds into focus and the status lines type out. Any
+ * key, click or tap skips ahead. "held" shows only the command while the
+ * dust intro plays over it; "instant" (already booted this session, or
+ * reduced motion) renders everything at once, without animation.
  */
 export function BootSequence({
 	lines,
-	instant,
+	mode,
 	onDone,
 }: {
 	lines: BootLine[];
-	instant: boolean;
+	mode: "held" | "play" | "instant";
 	onDone: () => void;
 }) {
 	// wordmark, each line, the whisper, the hint
 	const total = lines.length + 3;
-	const [shown, setShown] = useState(instant ? total : 0);
-	const [powering, setPowering] = useState(!instant);
+	const [shown, setShown] = useState(mode === "instant" ? total : 0);
 	const done = shown >= total;
-	const animate = !instant;
+	const animate = mode !== "instant";
+	const running = mode === "play" && !done;
 
 	useEffect(() => {
+		if (mode === "held") return;
 		if (done) {
 			onDone();
 			return;
 		}
-		const delay =
-			shown === 0 ? (powering ? POWER_MS : 120) : shown === 1 ? WORDMARK_HOLD_MS : STEP_MS;
+		const delay = shown === 0 ? 120 : shown === 1 ? WORDMARK_HOLD_MS : STEP_MS;
 		const timer = window.setTimeout(() => setShown((n) => n + 1), delay);
 		return () => window.clearTimeout(timer);
-	}, [shown, done, powering, onDone]);
+	}, [mode, shown, done, onDone]);
 
 	useEffect(() => {
-		if (done) return;
-		const skip = () => {
-			setPowering(false);
-			setShown(total);
-		};
+		if (!running) return;
+		const skip = () => setShown(total);
 		window.addEventListener("keydown", skip);
 		window.addEventListener("pointerdown", skip);
 		return () => {
 			window.removeEventListener("keydown", skip);
 			window.removeEventListener("pointerdown", skip);
 		};
-	}, [done, total]);
+	}, [running, total]);
 
 	return (
 		<section aria-label="System start" className="select-none pb-6 pt-10 sm:pt-20">
-			{/* Portaled so the flash covers the whole tube, nav included. */}
-			{powering &&
-				createPortal(
-					<>
-						<div className="crt-static" />
-						<div
-							className="crt-power"
-							onAnimationEnd={(e) => {
-								if (e.pseudoElement === "") setPowering(false);
-							}}
-						/>
-					</>,
-					document.body,
-				)}
+			<p id="boot-whoami" className="text-[19px] leading-snug text-fog sm:text-[21px]">
+				<span className="text-dim">$</span> whoami
+			</p>
 			{shown >= 1 && (
 				<h1
-					className={`${animate ? "bleed-in" : "scanned"} font-display text-[clamp(1.4rem,5.4vw,3.1rem)] leading-[1.08]`}
+					className={`${animate ? "bleed-in" : "scanned"} mt-1 font-display text-[clamp(1.4rem,5.4vw,3.1rem)] leading-[1.08]`}
 				>
 					<span className="glow-text">nimbus</span>
 				</h1>
@@ -124,7 +109,7 @@ export function BootSequence({
 					<span className="glow-text">/</span> for commands.
 				</p>
 			)}
-			{!done && (
+			{running && (
 				<p className="mt-10 text-[15px] uppercase tracking-[0.16em] text-dim">
 					press any key to skip
 				</p>
