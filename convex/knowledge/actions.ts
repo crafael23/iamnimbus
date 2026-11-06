@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
+import { needsScreening, SOURCE_GATE_VERSION } from "../_lib/knowledge";
 import { rag, vNamespace } from "../_lib/rag";
 import { checkContent } from "../_lib/safety";
 
@@ -21,10 +22,13 @@ export const ingest = internalAction({
 			docId,
 		});
 		if (!doc || doc.version !== version) return;
-		if (doc.source === "github") {
+		if (needsScreening(doc)) {
 			const verdict = await checkContent("source", { title: doc.title, content: doc.content });
 			if (verdict.cost > 0) {
-				await ctx.runMutation(internal.billing.internal.record, { costUsd: verdict.cost });
+				// A fraction of a cent; never let bookkeeping block indexing.
+				await ctx
+					.runMutation(internal.billing.internal.record, { costUsd: verdict.cost })
+					.catch((e: unknown) => console.error("could not record judge cost", e));
 			}
 			if (verdict.flagged) {
 				const ns = await rag.getNamespace(ctx, { namespace: doc.namespace });
@@ -56,6 +60,7 @@ export const ingest = internalAction({
 				version,
 				namespace: doc.namespace,
 				chunkCount: chunks.page.length,
+				screenedVersion: needsScreening(doc) ? SOURCE_GATE_VERSION : undefined,
 			});
 		} catch (error) {
 			await ctx.runMutation(internal.knowledge.mutations.markFailed, {

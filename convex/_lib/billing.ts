@@ -1,12 +1,16 @@
 import { ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { Tier } from "./persona";
 
 /**
  * The AI budget. Every chat-model and judge call records its cost (as
  * reported by the Convex AI Gateway) into `aiSpend`; embeddings are a fraction
- * of a cent and not counted. sendMessage refuses
- * new messages once the month or the day is spent. Spend can overshoot only
- * by replies already in flight when the line is crossed (cents).
+ * of a cent and not counted.
+ *
+ * Admission reserves each turn's worst-case cost (TURN_RESERVE_USD) before
+ * the turn is scheduled, so spent + reserved never passes the limit; the
+ * reservation is released when the turn finishes.
  *
  * Override with AI_MONTHLY_BUDGET_USD / AI_DAILY_BUDGET_USD in Convex env.
  */
@@ -31,12 +35,15 @@ export function periods(now: number) {
 	return { month: iso.slice(0, 7), day: iso.slice(0, 10) };
 }
 
+/** Rows per period: concurrent calls rarely write the same one. */
+const SPEND_SHARDS = 8;
+
 async function spentIn(ctx: QueryCtx, period: string) {
-	const row = await ctx.db
+	const rows = await ctx.db
 		.query("aiSpend")
-		.withIndex("by_period", (q) => q.eq("period", period))
-		.unique();
-	return row?.costUsd ?? 0;
+		.withIndex("by_period_shard", (q) => q.eq("period", period))
+		.collect();
+	return rows.reduce((sum, r) => sum + r.costUsd, 0);
 }
 
 export async function spendStatus(ctx: QueryCtx, now = Date.now()) {
@@ -46,25 +53,73 @@ export async function spendStatus(ctx: QueryCtx, now = Date.now()) {
 	return { month, day, limits };
 }
 
-/** Throws BUDGET when this month's or today's spend has reached its limit. */
-export async function assertBudget(ctx: QueryCtx) {
-	const { month, day, limits } = await spendStatus(ctx);
-	if (month >= limits.month) throw new ConvexError({ code: "BUDGET", scope: "month" });
-	if (day >= limits.day) throw new ConvexError({ code: "BUDGET", scope: "day" });
+/**
+ * Worst-case cost of one turn: up to 4 model steps at the tier's context and
+ * output caps (chat/agent.ts), plus the two judge calls, rounded up.
+ */
+export const TURN_RESERVE_USD: Record<Tier, number> = { guest: 0.02, registered: 0.5 };
+export const RESERVATION_TTL_MS = 10 * 60 * 1000;
+
+async function heldNow(ctx: QueryCtx, now: number) {
+	const rows = await ctx.db
+		.query("aiReservations")
+		.withIndex("by_createdAt", (q) => q.gt("createdAt", now - RESERVATION_TTL_MS))
+		.collect();
+	return rows.reduce((sum, r) => sum + r.amountUsd, 0);
+}
+
+/**
+ * Throws BUDGET unless this month's and today's spend, plus everything held
+ * for turns in flight, plus `extra`, stays within the limits.
+ */
+export async function assertBudget(ctx: QueryCtx, extra = 0, now = Date.now()) {
+	const { month, day, limits } = await spendStatus(ctx, now);
+	const held = (await heldNow(ctx, now)) + extra;
+	if (month + held > limits.month) throw new ConvexError({ code: "BUDGET", scope: "month" });
+	if (day + held > limits.day) throw new ConvexError({ code: "BUDGET", scope: "day" });
+}
+
+/** Hold a turn's worst-case cost, or throw BUDGET. Runs in sendMessage's transaction. */
+export async function reserveTurn(ctx: MutationCtx, tier: Tier, now = Date.now()) {
+	const amountUsd = TURN_RESERVE_USD[tier];
+	await assertBudget(ctx, amountUsd, now);
+	// Tidy a few expired holds left by crashed turns.
+	const expired = await ctx.db
+		.query("aiReservations")
+		.withIndex("by_createdAt", (q) => q.lte("createdAt", now - RESERVATION_TTL_MS))
+		.take(10);
+	for (const row of expired) await ctx.db.delete(row._id);
+	return await ctx.db.insert("aiReservations", { amountUsd, createdAt: now });
+}
+
+/**
+ * End a turn's hold. With `charge`, the held amount is recorded as spent
+ * instead (used when a real charge could not be recorded, to stay safe).
+ */
+export async function releaseReservation(
+	ctx: MutationCtx,
+	reservationId: Id<"aiReservations">,
+	charge: boolean,
+) {
+	const row = await ctx.db.get(reservationId);
+	if (!row) return;
+	if (charge) await recordSpend(ctx, row.amountUsd);
+	await ctx.db.delete(reservationId);
 }
 
 export async function recordSpend(ctx: MutationCtx, costUsd: number, now = Date.now()) {
 	if (!(costUsd > 0)) return;
 	const keys = periods(now);
+	const shard = Math.floor(Math.random() * SPEND_SHARDS);
 	for (const period of [keys.month, keys.day]) {
 		const row = await ctx.db
 			.query("aiSpend")
-			.withIndex("by_period", (q) => q.eq("period", period))
+			.withIndex("by_period_shard", (q) => q.eq("period", period).eq("shard", shard))
 			.unique();
 		if (row) {
 			await ctx.db.patch(row._id, { costUsd: row.costUsd + costUsd, calls: row.calls + 1 });
 		} else {
-			await ctx.db.insert("aiSpend", { period, costUsd, calls: 1 });
+			await ctx.db.insert("aiSpend", { period, shard, costUsd, calls: 1 });
 		}
 	}
 }

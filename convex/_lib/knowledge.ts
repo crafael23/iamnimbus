@@ -95,6 +95,20 @@ async function findDerivedDoc(
 }
 
 /** Create or refresh the knowledge doc that mirrors a blog post, project or repo. */
+/**
+ * Outside content must pass the prompt-injection gate (knowledge/actions.ts
+ * ingest) before the agent may read it. Bump this when the gate changes so
+ * every outside doc is re-checked on the next sync.
+ */
+export const SOURCE_GATE_VERSION = 1;
+
+export const needsScreening = (doc: Pick<Doc<"knowledgeDocs">, "source">) =>
+	doc.source === "github";
+
+/** Whether the agent may read this doc's indexed content. */
+export const isScreened = (doc: Pick<Doc<"knowledgeDocs">, "source" | "screenedVersion">) =>
+	!needsScreening(doc) || doc.screenedVersion === SOURCE_GATE_VERSION;
+
 export async function upsertDerivedDoc(
 	ctx: MutationCtx,
 	fields: {
@@ -112,7 +126,8 @@ export async function upsertDerivedDoc(
 	const unchanged =
 		existing.title === fields.title &&
 		existing.content === fields.content &&
-		existing.status !== "error";
+		existing.status !== "error" &&
+		isScreened(existing);
 	if (!unchanged) {
 		await updateKnowledgeDoc(ctx, existing, {
 			title: fields.title,

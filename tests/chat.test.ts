@@ -11,7 +11,17 @@ import {
 	signGuestAccess,
 	signGuestCookie,
 } from "../convex/_lib/guestToken";
-import { asUser, GUEST_A, GUEST_B, scheduled, setup, TEST_SECRET, tok } from "./setup";
+import { asUser, GUEST_A, GUEST_B, scheduled, setup, type T, TEST_SECRET, tok } from "./setup";
+
+// No network in tests: the judge refuses every message, so a scheduled turn
+// ends at the visitor gate with a saved reply (and no model call).
+vi.mock("../convex/_lib/safety", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../convex/_lib/safety")>()),
+	checkContent: async () => ({ flagged: true, probability: 0.99, cost: 0 }),
+}));
+
+/** Finish the scheduled reply, so the thread accepts its next message. */
+const settle = (t: T) => t.finishAllScheduledFunctions(vi.runAllTimers);
 
 beforeEach(() => {
 	// Freeze time so scheduled replies never run (no gateway calls) and the
@@ -150,6 +160,7 @@ describe("guest identity", () => {
 			const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(id, "shared") });
 			for (let i = 0; i < 10; i++) {
 				await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(id, "shared") });
+				await settle(t);
 			}
 		}
 		const fresh = "dddddddd-4444-4444-8444-dddddddddddd";
@@ -185,6 +196,7 @@ describe("message limits", () => {
 				guestToken: await tok(GUEST_A),
 			});
 			expect(res.used).toBe(i);
+			await settle(t);
 		}
 		expect(
 			await codeOf(
@@ -214,6 +226,7 @@ describe("message limits", () => {
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		for (let i = 1; i <= 10; i++) {
 			await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: `m${i}`, guestToken: await tok(GUEST_A) });
+			await settle(t);
 		}
 		const jobs = (await scheduled(t)).filter((j) => j.name.includes("generateResponse"));
 		const usedSeq = jobs.map((j) => (j.args[0] as { used: number }).used);
@@ -229,6 +242,7 @@ describe("message limits", () => {
 		const { threadId } = await user.mutation(api.chat.mutations.startThread, {});
 		for (let i = 1; i <= 30; i++) {
 			await user.mutation(api.chat.mutations.sendMessage, { threadId, prompt: `m${i}` });
+			await settle(t);
 		}
 		expect(await codeOf(user.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "m31" }))).toBe(
 			"DAILY_LIMIT",
@@ -236,6 +250,19 @@ describe("message limits", () => {
 		// Rolling window: after ~48 minutes one message has refilled.
 		vi.advanceTimersByTime(49 * 60 * 1000);
 		expect(await codeOf(user.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "later" }))).toBe("OK");
+	});
+
+	test("a thread takes one turn at a time; a stuck turn unblocks after two minutes", async () => {
+		const t = setup();
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "first", guestToken: await tok(GUEST_A) });
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) })),
+		).toBe("BUSY");
+		vi.advanceTimersByTime(2 * 60 * 1000 + 1);
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) })),
+		).toBe("OK");
 	});
 
 	test("a rejected guest message does not consume the session's allowance", async () => {

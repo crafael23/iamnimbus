@@ -85,15 +85,25 @@ export const { authKitEvent } = authKit.events({
 });
 
 type MembershipData = {
+	id?: string;
 	user_id?: string;
 	userId?: string;
 	organization_id?: string;
 	organizationId?: string;
 	status?: string;
+	updated_at?: string;
+	updatedAt?: string;
 	role?: { slug?: string };
 	roles?: Array<{ slug?: string }>;
 };
 
+/**
+ * Apply one membership event to the user's role. Webhooks can arrive late,
+ * twice or out of order, so: a deleted membership is remembered and never
+ * restored by a later event for the same membership (re-inviting the user
+ * creates a new membership id), and an update older than the one already
+ * applied is ignored.
+ */
 async function syncMembershipRole(ctx: MutationCtx, data: unknown, deleted: boolean) {
 	const m = data as MembershipData;
 	const userId = m.userId ?? m.user_id;
@@ -108,9 +118,27 @@ async function syncMembershipRole(ctx: MutationCtx, data: unknown, deleted: bool
 		.unique();
 	if (!user) return;
 
+	const membershipId = m.id;
+	const updatedAt = Date.parse(m.updatedAt ?? m.updated_at ?? "") || undefined;
+	if (!deleted && membershipId && user.revokedMembershipId === membershipId) return;
+	// Deletions always apply; only grants and updates can be stale.
+	if (
+		!deleted &&
+		membershipId &&
+		user.membershipId === membershipId &&
+		updatedAt !== undefined &&
+		user.membershipUpdatedAt !== undefined &&
+		updatedAt < user.membershipUpdatedAt
+	) {
+		return;
+	}
+
 	const active = !deleted && (m.status === undefined || m.status === "active");
 	await ctx.db.patch(user._id, {
 		role: active ? (m.role?.slug ?? m.roles?.[0]?.slug) : undefined,
+		membershipId: membershipId ?? user.membershipId,
+		membershipUpdatedAt: updatedAt ?? user.membershipUpdatedAt,
+		revokedMembershipId: deleted ? membershipId : user.revokedMembershipId,
 		updatedAt: Date.now(),
 	});
 }

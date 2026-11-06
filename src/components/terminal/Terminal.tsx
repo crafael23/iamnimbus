@@ -259,6 +259,9 @@ export function Terminal() {
 						? "The grid is at capacity for guest links right now. Sign in, or try again in a few minutes."
 						: "The grid is at capacity right now. Try again a little later.",
 				);
+			} else if (code === "BUSY") {
+				setInput(text);
+				print("notice", "Still answering the last message. Send this when it finishes.");
 			} else if (code === "BUDGET") {
 				const scope = (error as ConvexError<{ scope?: string }>).data.scope;
 				setInput(text);

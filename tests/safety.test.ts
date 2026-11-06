@@ -4,14 +4,19 @@ import { costOf, periods } from "../convex/_lib/billing";
 import type { Gate, Verdict } from "../convex/_lib/safety";
 import { asUser, GUEST_A, scheduled, setup, type T, tok } from "./setup";
 
-// The Jev judge is a network call; each test decides what it answers.
-const verdicts: Partial<Record<Gate, Verdict>> = {};
+// The Jev judge is a network call; each test decides what it answers
+// ("throw" simulates an unexpected crash inside the turn).
+const verdicts: Partial<Record<Gate, Verdict | "throw">> = {};
 const pass: Verdict = { flagged: false, probability: 0.02, cost: 0.00002 };
 vi.mock("../convex/_lib/safety", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../convex/_lib/safety")>();
 	return {
 		...actual,
-		checkContent: async (gate: Gate) => verdicts[gate] ?? pass,
+		checkContent: async (gate: Gate) => {
+			const verdict = verdicts[gate] ?? pass;
+			if (verdict === "throw") throw new Error("boom");
+			return verdict;
+		},
 	};
 });
 
@@ -57,8 +62,17 @@ describe("prompt-injection gates", () => {
 			{ role: "user", text: "[withheld by the safety check]" },
 			{ role: "assistant", text: expect.stringMatching(/attempt to change how this terminal works/) },
 		]);
-		// The judge's cost was counted.
-		expect((await spend(t)).map((r) => r.costUsd)).toEqual([0.00002, 0.00002]);
+		// The judge's cost was counted, once for the month and once for the day.
+		expect((await spend(t)).reduce((sum, r) => sum + r.costUsd, 0)).toBeCloseTo(0.00004);
+	});
+
+	test("a crash anywhere in the turn still ends it: prompt withheld, reply saved, hold released", async () => {
+		const t = setup();
+		verdicts.visitor = "throw";
+		const messages = await guestTurn(t, "hello");
+		expect(messages[0]?.text).toBe("[not sent: the safety check was unavailable]");
+		expect(messages[1]?.text).toMatch(/Transmission lost/);
+		expect(await t.run((ctx) => ctx.db.query("aiReservations").collect())).toEqual([]);
 	});
 
 	test("when the judge is down, nothing is sent (fail closed)", async () => {
@@ -99,7 +113,79 @@ describe("prompt-injection gates", () => {
 	});
 });
 
+describe("outside content screening", () => {
+	test("GitHub docs indexed before the gate existed are re-checked and hidden until they pass", async () => {
+		const t = setup();
+		const docId = await t.run((ctx) =>
+			ctx.db.insert("knowledgeDocs", {
+				namespace: "github",
+				title: "tool (GitHub)",
+				content: "old content",
+				source: "github",
+				sourceKey: "acme/tool",
+				status: "ready",
+				version: 1,
+				updatedAt: 0,
+			}),
+		);
+		// Never screened: retrieval ignores it.
+		expect(await t.query(internal.knowledge.queries.existingDocIds, { keys: [docId] })).toEqual([]);
+		// The next sync re-ingests it even though nothing changed upstream.
+		await t.run((ctx) => ctx.db.patch(docId, { content: "GitHub repository acme/tool" }));
+		const before = await t.run((ctx) => ctx.db.get(docId));
+		await t.mutation(internal.github.mutations.applySync, {
+			username: "owner",
+			repos: [
+				{
+					fullName: "acme/tool",
+					name: "tool",
+					url: "https://github.com/acme/tool",
+					languages: [],
+					topics: [],
+					stars: 0,
+					forks: 0,
+					archived: false,
+					createdAt: 0,
+					pushedAt: 0,
+				},
+			],
+		});
+		const after = await t.run((ctx) => ctx.db.get(docId));
+		expect(after?.version).toBeGreaterThan(before?.version ?? 0);
+		expect(after?.status).toBe("pending");
+	});
+});
+
 describe("the AI budget", () => {
+	test("each turn holds its worst case: a registered turn is refused near the daily limit, a guest turn fits", async () => {
+		const t = setup();
+		const user = await asUser(t, "user_reg");
+		await t.run(async (ctx) => {
+			await ctx.db.insert("aiSpend", { period: periods(Date.now()).day, costUsd: 2.6, calls: 1 });
+		});
+		const registered = await user.mutation(api.chat.mutations.startThread, {});
+		expect(
+			await codeOf(user.mutation(api.chat.mutations.sendMessage, { threadId: registered.threadId, prompt: "hi" })),
+		).toBe("BUDGET");
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) })),
+		).toBe("OK");
+		expect(await t.run((ctx) => ctx.db.query("aiReservations").collect())).toHaveLength(1);
+	});
+
+	test("held amounts from turns in flight count against the limit", async () => {
+		const t = setup();
+		await t.run(async (ctx) => {
+			await ctx.db.insert("aiSpend", { period: periods(Date.now()).day, costUsd: 2.97, calls: 1 });
+			await ctx.db.insert("aiReservations", { amountUsd: 0.02, createdAt: Date.now() });
+		});
+		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
+		expect(
+			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) })),
+		).toBe("BUDGET");
+	});
+
 	test("messages stop once this month's budget is spent", async () => {
 		const t = setup();
 		await t.run(async (ctx) => {
@@ -130,8 +216,10 @@ describe("the AI budget", () => {
 		await t.mutation(internal.billing.internal.record, { costUsd: 0.02 });
 		const rows = await spend(t);
 		const keys = periods(Date.now());
-		expect(rows.find((r) => r.period === keys.month)).toMatchObject({ costUsd: 0.05, calls: 2 });
-		expect(rows.find((r) => r.period === keys.day)).toMatchObject({ costUsd: 0.05, calls: 2 });
+		const total = (period: string) =>
+			rows.filter((r) => r.period === period).reduce((sum, r) => sum + r.costUsd, 0);
+		expect(total(keys.month)).toBeCloseTo(0.05);
+		expect(total(keys.day)).toBeCloseTo(0.05);
 	});
 
 	test("cost comes from the gateway, else an estimate at list price", () => {
@@ -182,6 +270,42 @@ describe("WorkOS membership events", () => {
 		expect(await roleOf(t)).toBeNull();
 		await t.mutation(internal.auth.authKitEvent, { event: "organization_membership.updated", data: membership() });
 		expect(await roleOf(t)).toBe("admin");
+	});
+
+	test("a late update for a deleted membership cannot restore admin; a new membership can", async () => {
+		const t = setup();
+		await asUser(t, "user_admin", "admin");
+		const at = (iso: string, extra = {}) => ({ ...membership(), updated_at: iso, ...extra });
+		await t.mutation(internal.auth.authKitEvent, {
+			event: "organization_membership.deleted",
+			data: at("2026-11-02T00:00:00Z"),
+		});
+		await t.mutation(internal.auth.authKitEvent, {
+			event: "organization_membership.updated",
+			data: at("2026-11-01T00:00:00Z"),
+		});
+		expect(await roleOf(t)).toBeNull();
+		// Re-inviting creates a new membership id.
+		await t.mutation(internal.auth.authKitEvent, {
+			event: "organization_membership.created",
+			data: at("2026-11-03T00:00:00Z", { id: "om_2" }),
+		});
+		expect(await roleOf(t)).toBe("admin");
+	});
+
+	test("an update older than the one applied is ignored", async () => {
+		const t = setup();
+		await asUser(t, "user_admin");
+		const at = (iso: string, slug: string) => ({ ...membership(), updated_at: iso, role: { slug } });
+		await t.mutation(internal.auth.authKitEvent, {
+			event: "organization_membership.updated",
+			data: at("2026-11-02T00:00:00Z", "member"),
+		});
+		await t.mutation(internal.auth.authKitEvent, {
+			event: "organization_membership.updated",
+			data: at("2026-11-01T00:00:00Z", "admin"),
+		});
+		expect(await roleOf(t)).toBe("member");
 	});
 
 	test("memberships in other organizations neither grant nor revoke", async () => {

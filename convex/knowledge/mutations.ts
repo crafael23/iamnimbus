@@ -72,8 +72,9 @@ export const markIngested = internalMutation({
 		version: v.number(),
 		namespace: vNamespace,
 		chunkCount: v.number(),
+		screenedVersion: v.optional(v.number()),
 	},
-	handler: async (ctx, { docId, version, namespace, chunkCount }) => {
+	handler: async (ctx, { docId, version, namespace, chunkCount, screenedVersion }) => {
 		const doc = await ctx.db.get(docId);
 		if (!doc) {
 			// Deleted while ingesting: drop the vectors this run just wrote.
@@ -95,6 +96,7 @@ export const markIngested = internalMutation({
 		await ctx.db.patch(docId, {
 			status: "ready",
 			error: undefined,
+			screenedVersion,
 			chunkCount,
 			ingestedAt: Date.now(),
 		});

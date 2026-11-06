@@ -23,6 +23,12 @@ export default defineSchema({
 		email: v.string(),
 		pictureUrl: v.optional(v.string()),
 		role: v.optional(v.string()), // WorkOS org membership role slug (member, admin, etc.)
+		// Ordering for membership webhooks, which can arrive late or twice:
+		// the membership the role came from, its last update, and the last
+		// deleted membership (never resurrected by a stale event).
+		membershipId: v.optional(v.string()),
+		membershipUpdatedAt: v.optional(v.number()),
+		revokedMembershipId: v.optional(v.string()),
 		createdAt: v.number(),
 		updatedAt: v.optional(v.number()),
 	})
@@ -46,6 +52,8 @@ export default defineSchema({
 		version: v.number(),
 		chunkCount: v.optional(v.number()),
 		ingestedAt: v.optional(v.number()),
+		/** Prompt-injection gate version this content passed (outside sources only). */
+		screenedVersion: v.optional(v.number()),
 		updatedAt: v.number(),
 	})
 		.index("by_namespace", ["namespace"])
@@ -113,15 +121,27 @@ export default defineSchema({
 	}),
 
 	/**
-	 * AI spend in US dollars, one row per month ("2026-11") and per day
-	 * ("2026-11-05"), UTC. Written after every model or judge call; read by
-	 * sendMessage to enforce the budget.
+	 * AI spend in US dollars per month ("2026-11") and per day ("2026-11-05"),
+	 * UTC, spread over a few shards so concurrent calls do not contend on one
+	 * row. Written after every model or judge call; summed by sendMessage to
+	 * enforce the budget.
 	 */
 	aiSpend: defineTable({
 		period: v.string(),
+		shard: v.optional(v.number()),
 		costUsd: v.number(),
 		calls: v.number(),
-	}).index("by_period", ["period"]),
+	}).index("by_period_shard", ["period", "shard"]),
+
+	/**
+	 * Worst-case cost held for each accepted chat turn until it finishes, so
+	 * queued turns cannot overshoot the budget. Rows older than the TTL in
+	 * _lib/billing.ts are ignored (a crashed turn cannot hold money forever).
+	 */
+	aiReservations: defineTable({
+		amountUsd: v.number(),
+		createdAt: v.number(),
+	}).index("by_createdAt", ["createdAt"]),
 
 	githubSyncRuns: defineTable({
 		username: v.string(),

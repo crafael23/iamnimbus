@@ -59,7 +59,8 @@ function makeAgent(tier: Tier) {
 		tools: { searchKnowledge },
 		stopWhen: stepCountIs(4),
 		callSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS[tier] },
-		contextOptions: { recentMessages: tier === "guest" ? 20 : 40 },
+		// Bounded history keeps a turn's worst case inside TURN_RESERVE_USD.
+		contextOptions: { recentMessages: tier === "guest" ? 20 : 16 },
 		// Every step's cost counts against the monthly and daily AI budget.
 		usageHandler: async (ctx, { model, usage, providerMetadata }) => {
 			await ctx.runMutation(internal.billing.internal.record, {
