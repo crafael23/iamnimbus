@@ -36,8 +36,7 @@ const codeOf = async (p: Promise<unknown>) => {
 	return "OK";
 };
 
-const spend = (t: T) =>
-	t.run((ctx) => ctx.db.query("aiSpend").collect());
+const spend = (t: T) => t.run((ctx) => ctx.db.query("aiSpend").collect());
 
 async function guestTurn(t: T, prompt: string) {
 	const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
@@ -169,7 +168,9 @@ describe("the AI budget", () => {
 		).toBe("BUDGET");
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) }),
+			),
 		).toBe("OK");
 		expect(await t.run((ctx) => ctx.db.query("aiReservations").collect())).toHaveLength(1);
 	});
@@ -205,10 +206,7 @@ describe("the AI budget", () => {
 			guestToken: await tok(GUEST_A),
 			paginationOpts: { numItems: 10, cursor: null },
 		});
-		expect(page.map((m) => m.text)).toEqual([
-			"[not sent: over budget]",
-			expect.stringMatching(/power budget/),
-		]);
+		expect(page.map((m) => m.text)).toEqual(["[not sent: over budget]", expect.stringMatching(/power budget/)]);
 	});
 
 	test("an expired hold that was never cleaned up still has to fit the budget again", async () => {
@@ -254,7 +252,9 @@ describe("the AI budget", () => {
 		});
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) }),
+			),
 		).toBe("BUDGET");
 	});
 
@@ -265,7 +265,9 @@ describe("the AI budget", () => {
 		});
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "hi", guestToken: await tok(GUEST_A) }),
+			),
 		).toBe("BUDGET");
 		// The rejected message spent none of the guest's allowance.
 		const session = await t.query(api.chat.queries.session, { guestToken: await tok(GUEST_A) });
@@ -288,14 +290,15 @@ describe("the AI budget", () => {
 		await t.mutation(internal.billing.internal.record, { costUsd: 0.02 });
 		const rows = await spend(t);
 		const keys = periods(Date.now());
-		const total = (period: string) =>
-			rows.filter((r) => r.period === period).reduce((sum, r) => sum + r.costUsd, 0);
+		const total = (period: string) => rows.filter((r) => r.period === period).reduce((sum, r) => sum + r.costUsd, 0);
 		expect(total(keys.month)).toBeCloseTo(0.05);
 		expect(total(keys.day)).toBeCloseTo(0.05);
 	});
 
 	test("cost comes from the gateway, else an estimate at list price", () => {
-		expect(costOf("anthropic/claude-haiku-5.5", { inputTokens: 1000 }, { convexGateway: { cost: 0.0042 } })).toBe(0.0042);
+		expect(costOf("anthropic/claude-haiku-5.5", { inputTokens: 1000 }, { convexGateway: { cost: 0.0042 } })).toBe(
+			0.0042,
+		);
 		expect(costOf("anthropic/claude-haiku-5.5", { inputTokens: 1000, raw: { cost: 0.001 } }, undefined)).toBe(0.001);
 		expect(costOf("anthropic/claude-sonnet-5.5", { inputTokens: 1_000_000, outputTokens: 100_000 }, undefined)).toBe(3);
 	});
@@ -323,9 +326,15 @@ describe("WorkOS membership events", () => {
 	});
 
 	const roleOf = (t: T) =>
-		t.run(async (ctx) =>
-			// t.run serializes, so a missing role comes back as null.
-			(await ctx.db.query("users").withIndex("by_authId", (q) => q.eq("authId", "user_admin")).unique())?.role ?? null,
+		t.run(
+			async (ctx) =>
+				// t.run serializes, so a missing role comes back as null.
+				(
+					await ctx.db
+						.query("users")
+						.withIndex("by_authId", (q) => q.eq("authId", "user_admin"))
+						.unique()
+				)?.role ?? null,
 		);
 
 	test("deleting the membership revokes admin", async () => {
@@ -338,7 +347,10 @@ describe("WorkOS membership events", () => {
 	test("an inactive membership revokes admin; reactivating restores it", async () => {
 		const t = setup();
 		await asUser(t, "user_admin", "admin");
-		await t.mutation(internal.auth.authKitEvent, { event: "organization_membership.updated", data: membership("inactive") });
+		await t.mutation(internal.auth.authKitEvent, {
+			event: "organization_membership.updated",
+			data: membership("inactive"),
+		});
 		expect(await roleOf(t)).toBeNull();
 		await t.mutation(internal.auth.authKitEvent, { event: "organization_membership.updated", data: membership() });
 		expect(await roleOf(t)).toBe("admin");
@@ -407,13 +419,15 @@ describe("WorkOS membership events", () => {
 	});
 });
 
- test("topics are recorded only after the visitor gate passes", async () => {
- const t = setup();
- verdicts.visitor = { flagged: true, probability: 1, cost: 0, topic: "skills" };
- await guestTurn(t, "blocked");
- expect(await t.run(ctx => ctx.db.query("analyticsEvents").collect())).not.toEqual(expect.arrayContaining([expect.objectContaining({ kind: "topic" })]));
- verdicts.visitor = pass;
- await guestTurn(t, "projects?");
- const events = await t.run(ctx => ctx.db.query("analyticsEvents").collect());
- expect(events.filter(e => e.kind === "topic")).toMatchObject([{ topic: "projects" }]);
- });
+test("topics are recorded only after the visitor gate passes", async () => {
+	const t = setup();
+	verdicts.visitor = { flagged: true, probability: 1, cost: 0, topic: "skills" };
+	await guestTurn(t, "blocked");
+	expect(await t.run((ctx) => ctx.db.query("analyticsEvents").collect())).not.toEqual(
+		expect.arrayContaining([expect.objectContaining({ kind: "topic" })]),
+	);
+	verdicts.visitor = pass;
+	await guestTurn(t, "projects?");
+	const events = await t.run((ctx) => ctx.db.query("analyticsEvents").collect());
+	expect(events.filter((e) => e.kind === "topic")).toMatchObject([{ topic: "projects" }]);
+});

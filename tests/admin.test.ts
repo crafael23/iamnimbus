@@ -67,7 +67,7 @@ const project = {
  * if a new adminQuery/adminMutation/adminAction is added without a row here.
  */
 const ADMIN_CALLS = {
- "analytics.queries.summary": (c: Caller) => c.query(api.analytics.queries.summary, { days: 7 }),
+	"analytics.queries.summary": (c: Caller) => c.query(api.analytics.queries.summary, { days: 7 }),
 	"knowledge.queries.list": (c: Caller) => c.query(api.knowledge.queries.list, {}),
 	"knowledge.queries.get": (c: Caller, f: Fixture) => c.query(api.knowledge.queries.get, { docId: f.docId }),
 	"knowledge.queries.statusForSource": (c: Caller, f: Fixture) =>
@@ -118,7 +118,10 @@ describe("admin guards", () => {
 				}
 				if (!name.endsWith(".ts")) continue;
 				const src = readFileSync(path, "utf8");
-				const mod = path.replace(/^convex\//, "").replace(/\.ts$/, "").replaceAll("/", ".");
+				const mod = path
+					.replace(/^convex\//, "")
+					.replace(/\.ts$/, "")
+					.replaceAll("/", ".");
 				for (const m of src.matchAll(/export const (\w+) = admin(Query|Mutation|Action)\(/g)) {
 					found.push(`${mod}.${m[1]}`);
 				}

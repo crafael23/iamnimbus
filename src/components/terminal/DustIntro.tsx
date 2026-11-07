@@ -187,8 +187,7 @@ function vnoise(x: number) {
 }
 
 /** How hard a finger presses at this point of the sweep, 0..1. */
-const pressure = (f: Finger, u: number) =>
-	smooth(clamp01((u - f.t0) / 0.12)) * smooth(clamp01((f.t1 - u) / 0.22));
+const pressure = (f: Finger, u: number) => smooth(clamp01((u - f.t0) / 0.12)) * smooth(clamp01((f.t1 - u) / 0.22));
 
 function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
 	const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -408,9 +407,7 @@ function nextPalm(glass: Glass, dir: number): Pass | null {
 }
 
 const toUrl = (canvas: HTMLCanvasElement) =>
-	new Promise<string | null>((resolve) =>
-		canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null)),
-	);
+	new Promise<string | null>((resolve) => canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null)));
 
 function setMask(el: HTMLElement, url: string) {
 	el.style.setProperty("mask-image", `url(${url})`);
@@ -717,7 +714,13 @@ function useDustGlass({
 		const frame = raf.current;
 		const id = window.setTimeout(() => {
 			const g = glass.current;
-			if (g) sweepGlass(g, frame, () => measure(), () => finished());
+			if (g)
+				sweepGlass(
+					g,
+					frame,
+					() => measure(),
+					() => finished(),
+				);
 			else finished();
 		}, DORMANT_MS);
 		return () => window.clearTimeout(id);
@@ -772,9 +775,6 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 		reveal();
 		setStage("fade");
 	}, [reveal, stop]);
-
-
-
 
 	// The sequence after the glass is wiped.
 	useEffect(() => {
@@ -852,11 +852,14 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 				 * dimmed, masked to where dust is left. Clean glass shows them sharp.
 				 */}
 				{onGlass && (
-					<div ref={hazeEl} className={`intro-tube intro-tube-masked intro-tube-haze font-crt ${clear}`} style={hazeStyle}>
+					<div
+						ref={hazeEl}
+						className={`intro-tube intro-tube-masked intro-tube-haze font-crt ${clear}`}
+						style={hazeStyle}
+					>
 						{windows}
 					</div>
 				)}
-
 
 				{/* The clock stays legible through the dust: it sits above the glow. */}
 				<div className="intro-tube intro-tube-front font-crt" style={curve}>
@@ -868,7 +871,6 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 				{onGlass && <div className={`intro-sheen ${clear}`} />}
 
 				{lit && <StaticBurst />}
-
 			</div>
 
 			<p className={`intro-hint font-crt ${reached(stage, "maximize") ? "intro-hint-off" : ""}`}>
@@ -958,10 +960,7 @@ function useTyping(typing: boolean, onTyped: () => void) {
 	useEffect(() => {
 		if (!typing) return;
 		const more = typed < COMMAND.length;
-		const id = window.setTimeout(
-			() => (more ? setTyped((n) => n + 1) : done()),
-			more ? 85 + Math.random() * 90 : 420,
-		);
+		const id = window.setTimeout(() => (more ? setTyped((n) => n + 1) : done()), more ? 85 + Math.random() * 90 : 420);
 		return () => window.clearTimeout(id);
 	}, [typing, typed]);
 	return typed;

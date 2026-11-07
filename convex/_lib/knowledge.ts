@@ -14,11 +14,7 @@ type KnowledgeSource = Infer<typeof vKnowledgeSource>;
  * `pending` and its ingestion is scheduled atomically with the save.
  */
 
-async function scheduleIngest(
-	ctx: MutationCtx,
-	docId: Id<"knowledgeDocs">,
-	version: number,
-) {
+async function scheduleIngest(ctx: MutationCtx, docId: Id<"knowledgeDocs">, version: number) {
 	await ctx.scheduler.runAfter(0, internal.knowledge.actions.ingest, {
 		docId,
 		version,
@@ -62,20 +58,14 @@ export async function updateKnowledgeDoc(
 	await scheduleIngest(ctx, doc._id, version);
 }
 
-export async function reingestKnowledgeDoc(
-	ctx: MutationCtx,
-	doc: Doc<"knowledgeDocs">,
-) {
+export async function reingestKnowledgeDoc(ctx: MutationCtx, doc: Doc<"knowledgeDocs">) {
 	await updateKnowledgeDoc(ctx, doc, {
 		title: doc.title,
 		content: doc.content,
 	});
 }
 
-export async function deleteKnowledgeDoc(
-	ctx: MutationCtx,
-	doc: Doc<"knowledgeDocs">,
-) {
+export async function deleteKnowledgeDoc(ctx: MutationCtx, doc: Doc<"knowledgeDocs">) {
 	await ctx.db.delete("knowledgeDocs", doc._id);
 	await ctx.scheduler.runAfter(0, internal.knowledge.actions.removeFromIndex, {
 		namespace: doc.namespace,
@@ -83,16 +73,10 @@ export async function deleteKnowledgeDoc(
 	});
 }
 
-async function findDerivedDoc(
-	ctx: MutationCtx,
-	source: KnowledgeSource,
-	sourceKey: string,
-) {
+async function findDerivedDoc(ctx: MutationCtx, source: KnowledgeSource, sourceKey: string) {
 	return await ctx.db
 		.query("knowledgeDocs")
-		.withIndex("by_source", (q) =>
-			q.eq("source", source).eq("sourceKey", sourceKey),
-		)
+		.withIndex("by_source", (q) => q.eq("source", source).eq("sourceKey", sourceKey))
 		.unique();
 }
 
@@ -104,8 +88,7 @@ async function findDerivedDoc(
  */
 export const SOURCE_GATE_VERSION = 1;
 
-export const needsScreening = (doc: Pick<Doc<"knowledgeDocs">, "source">) =>
-	doc.source === "github";
+export const needsScreening = (doc: Pick<Doc<"knowledgeDocs">, "source">) => doc.source === "github";
 
 /** Whether the agent may read this doc's indexed content. */
 export const isScreened = (doc: Pick<Doc<"knowledgeDocs">, "source" | "screenedVersion">) =>

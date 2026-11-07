@@ -81,4 +81,3 @@ export const removeFromIndex = internalAction({
 		await rag.deleteByKey(ctx, { namespaceId: ns.namespaceId, key });
 	},
 });
-

@@ -93,8 +93,7 @@ describe("tier and model routing", () => {
 
 	test("a guest needs a token the server signed", async () => {
 		const t = setup();
-		const start = (guestToken?: string) =>
-			codeOf(t.mutation(api.chat.mutations.startThread, { guestToken }));
+		const start = (guestToken?: string) => codeOf(t.mutation(api.chat.mutations.startThread, { guestToken }));
 		expect(await start()).toBe("NO_SESSION");
 		expect(await start("not-a-token")).toBe("NO_SESSION");
 		// Signed with another secret.
@@ -118,11 +117,13 @@ describe("tier and model routing", () => {
 		expect(
 			await codeOf(t.query(api.chat.queries.listThreadMessages, { threadId, guestToken: token, paginationOpts: page })),
 		).toBe("OK");
+		expect(await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: token }))).toBe(
+			"NO_SESSION",
+		);
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: token })),
-		).toBe("NO_SESSION");
-		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(GUEST_A) })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(GUEST_A) }),
+			),
 		).toBe("OK");
 	});
 });
@@ -147,9 +148,7 @@ describe("guest identity", () => {
 		expect(await hashNetwork(TEST_SECRET, "203.0.113.0/24")).toBe(
 			await hashNetwork(TEST_SECRET, networkPrefix("203.0.113.99")),
 		);
-		expect(await hashNetwork(TEST_SECRET, "203.0.113.0/24")).not.toBe(
-			await hashNetwork(TEST_SECRET, "203.0.114.0/24"),
-		);
+		expect(await hashNetwork(TEST_SECRET, "203.0.113.0/24")).not.toBe(await hashNetwork(TEST_SECRET, "203.0.114.0/24"));
 	});
 
 	test("a new guest id on the same network shares the network's daily cap", async () => {
@@ -159,14 +158,20 @@ describe("guest identity", () => {
 		for (const id of ids) {
 			const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(id, "shared") });
 			for (let i = 0; i < 10; i++) {
-				await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(id, "shared") });
+				await t.mutation(api.chat.mutations.sendMessage, {
+					threadId,
+					prompt: "x",
+					guestToken: await tok(id, "shared"),
+				});
 				await settle(t);
 			}
 		}
 		const fresh = "dddddddd-4444-4444-8444-dddddddddddd";
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(fresh, "shared") });
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(fresh, "shared") })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x", guestToken: await tok(fresh, "shared") }),
+			),
 		).toBe("NETWORK_LIMIT");
 		// The rejected message did not spend the new guest's own allowance.
 		const status = await t.query(api.chat.queries.session, { guestToken: await tok(fresh, "shared") });
@@ -210,13 +215,21 @@ describe("message limits", () => {
 		const other = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_B) });
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId: other.threadId, prompt: "x", guestToken: await tok(GUEST_B) }),
+				t.mutation(api.chat.mutations.sendMessage, {
+					threadId: other.threadId,
+					prompt: "x",
+					guestToken: await tok(GUEST_B),
+				}),
 			),
 		).toBe("OK");
 		const again = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId: again.threadId, prompt: "x", guestToken: await tok(GUEST_A) }),
+				t.mutation(api.chat.mutations.sendMessage, {
+					threadId: again.threadId,
+					prompt: "x",
+					guestToken: await tok(GUEST_A),
+				}),
 			),
 		).toBe("GUEST_LIMIT");
 	});
@@ -257,14 +270,18 @@ describe("message limits", () => {
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		await t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "first", guestToken: await tok(GUEST_A) });
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) }),
+			),
 		).toBe("BUSY");
 		// The reply job stalls (cancelled here so the clock does not run it).
 		const stalled = (await scheduled(t)).find((j) => j.name.includes("generateResponse"));
 		await t.run((ctx) => ctx.scheduler.cancel(stalled!._id));
 		vi.advanceTimersByTime(2 * 60 * 1000 + 1);
 		expect(
-			await codeOf(t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) })),
+			await codeOf(
+				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "second", guestToken: await tok(GUEST_A) }),
+			),
 		).toBe("OK");
 		// The abandoned, never-judged prompt is fenced out of history.
 		const { page } = await t.query(api.chat.queries.listThreadMessages, {
@@ -280,7 +297,11 @@ describe("message limits", () => {
 		const { threadId } = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
 		expect(
 			await codeOf(
-				t.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x".repeat(2001), guestToken: await tok(GUEST_A) }),
+				t.mutation(api.chat.mutations.sendMessage, {
+					threadId,
+					prompt: "x".repeat(2001),
+					guestToken: await tok(GUEST_A),
+				}),
 			),
 		).toBe("TOO_LONG");
 		const status = await t.query(api.chat.queries.session, { guestToken: await tok(GUEST_A) });
@@ -304,7 +325,11 @@ describe("thread ownership", () => {
 
 		expect(
 			await codeOf(
-				t.query(api.chat.queries.listThreadMessages, { threadId, guestToken: await tok(GUEST_B), paginationOpts: page }),
+				t.query(api.chat.queries.listThreadMessages, {
+					threadId,
+					guestToken: await tok(GUEST_B),
+					paginationOpts: page,
+				}),
 			),
 		).toBe("FORBIDDEN");
 		expect(
@@ -328,7 +353,11 @@ describe("thread ownership", () => {
 		);
 		expect(
 			await codeOf(
-				t.query(api.chat.queries.listThreadMessages, { threadId, guestToken: await tok(GUEST_A), paginationOpts: page }),
+				t.query(api.chat.queries.listThreadMessages, {
+					threadId,
+					guestToken: await tok(GUEST_A),
+					paginationOpts: page,
+				}),
 			),
 		).toBe("FORBIDDEN");
 		expect(await codeOf(bob.mutation(api.chat.mutations.sendMessage, { threadId, prompt: "x" }))).toBe("FORBIDDEN");
@@ -359,9 +388,15 @@ describe("thread ownership", () => {
 	test("a guest can resume only its own thread", async () => {
 		const t = setup();
 		const a = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A) });
-		const resumed = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_A), resume: a.threadId });
+		const resumed = await t.mutation(api.chat.mutations.startThread, {
+			guestToken: await tok(GUEST_A),
+			resume: a.threadId,
+		});
 		expect(resumed.threadId).toBe(a.threadId);
-		const stolen = await t.mutation(api.chat.mutations.startThread, { guestToken: await tok(GUEST_B), resume: a.threadId });
+		const stolen = await t.mutation(api.chat.mutations.startThread, {
+			guestToken: await tok(GUEST_B),
+			resume: a.threadId,
+		});
 		expect(stolen.threadId).not.toBe(a.threadId);
 	});
 });

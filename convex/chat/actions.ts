@@ -10,8 +10,7 @@ import { agents } from "./agent";
 const REFUSED_PROMPT =
 	"That reads like an attempt to change how this terminal works, so it was not run. Ask about projects, writing or work instead.";
 const WITHHELD_REPLY = "This reply was withheld by a safety check. Try asking another way.";
-const JUDGE_DOWN =
-	"The safety check is not answering right now, so nothing was sent. Try again in a minute.";
+const JUDGE_DOWN = "The safety check is not answering right now, so nothing was sent. Try again in a minute.";
 const TURN_FAILED = "Transmission lost. Send the message again.";
 const OUT_OF_BUDGET =
 	"The terminal has used its power budget for now and is resting. Projects and writing are still open.";

@@ -55,9 +55,7 @@ export function Terminal() {
 	const { user } = useAuth();
 	const boot = useBoot();
 	const [cleared, setCleared] = useState(0);
-	const { threadId, session, messages, linkFailed, isAuthenticated } = useChatThread((id) =>
-		setCleared(clearedAt(id)),
-	);
+	const { threadId, session, messages, linkFailed, isAuthenticated } = useChatThread((id) => setCleared(clearedAt(id)));
 	useGuestConversion(isAuthenticated);
 	const sendMessage = useMutation(api.chat.mutations.sendMessage).withOptimisticUpdate((store, args) =>
 		optimisticallySendMessage(api.chat.queries.listThreadMessages)(store, {

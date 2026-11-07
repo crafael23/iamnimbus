@@ -5,11 +5,7 @@ import { components } from "../_generated/api";
 import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { readGuestAccess } from "../_lib/guestToken";
 import type { Tier } from "../_lib/persona";
-import {
-	GUEST_MESSAGE_LIMIT,
-	REGISTERED_MESSAGE_LIMIT,
-	rateLimiter,
-} from "../_lib/rateLimits";
+import { GUEST_MESSAGE_LIMIT, REGISTERED_MESSAGE_LIMIT, rateLimiter } from "../_lib/rateLimits";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -49,15 +45,10 @@ export async function resolveChatOwner(
 }
 
 /** Throws FORBIDDEN unless the thread exists and belongs to `owner`. */
-export async function authorizeThreadAccess(
-	ctx: Ctx,
-	threadId: string,
-	owner: ChatOwner,
-): Promise<void> {
+export async function authorizeThreadAccess(ctx: Ctx, threadId: string, owner: ChatOwner): Promise<void> {
 	let threadOwner: string | undefined;
 	try {
-		threadOwner = (await getThreadMetadata(ctx, components.agent, { threadId }))
-			.userId;
+		threadOwner = (await getThreadMetadata(ctx, components.agent, { threadId })).userId;
 	} catch {
 		threadOwner = undefined;
 	}
@@ -66,14 +57,12 @@ export async function authorizeThreadAccess(
 	}
 }
 
-export async function latestThreadId(
-	ctx: Ctx,
-	ownerId: string,
-): Promise<string | null> {
-	const { page } = await ctx.runQuery(
-		components.agent.threads.listThreadsByUserId,
-		{ userId: ownerId, order: "desc", paginationOpts: { numItems: 1, cursor: null } },
-	);
+export async function latestThreadId(ctx: Ctx, ownerId: string): Promise<string | null> {
+	const { page } = await ctx.runQuery(components.agent.threads.listThreadsByUserId, {
+		userId: ownerId,
+		order: "desc",
+		paginationOpts: { numItems: 1, cursor: null },
+	});
 	return page[0]?._id ?? null;
 }
 

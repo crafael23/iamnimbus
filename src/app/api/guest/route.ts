@@ -25,21 +25,13 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ error: "guest links are not configured" }, { status: 500 });
 	}
 	const now = Date.now();
-	const sub =
-		(await readGuestCookie(secret, request.cookies.get(GUEST_COOKIE)?.value, now)) ??
-		newGuestId();
+	const sub = (await readGuestCookie(secret, request.cookies.get(GUEST_COOKIE)?.value, now)) ?? newGuestId();
 
-	const address =
-		request.headers.get("x-forwarded-for")?.split(",")[0] ??
-		request.headers.get("x-real-ip") ??
-		"";
+	const address = request.headers.get("x-forwarded-for")?.split(",")[0] ?? request.headers.get("x-real-ip") ?? "";
 	const net = await hashNetwork(secret, networkPrefix(address));
 	const { token, exp } = await signGuestAccess(secret, sub, net, now);
 
-	const response = NextResponse.json(
-		{ token, expiresAt: exp },
-		{ headers: { "Cache-Control": "no-store" } },
-	);
+	const response = NextResponse.json({ token, expiresAt: exp }, { headers: { "Cache-Control": "no-store" } });
 	// Re-signed on every call, so an active guest keeps the same id.
 	response.cookies.set(GUEST_COOKIE, await signGuestCookie(secret, sub, now), {
 		httpOnly: true,

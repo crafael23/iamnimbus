@@ -29,9 +29,7 @@ test("new sessions and successful messages are counted by server tier, resumes a
 	expect(result.sessions).toEqual({ guest: 1, registered: 1 });
 	expect(result.messages).toEqual({ guest: 1, registered: 1 });
 	await expect(user.query(api.analytics.queries.summary, { days: 7 })).rejects.toThrow("Admin");
-	await expect(t.query(api.analytics.queries.summary, { days: 30 })).rejects.toThrow(
-		"authenticated",
-	);
+	await expect(t.query(api.analytics.queries.summary, { days: 30 })).rejects.toThrow("authenticated");
 });
 test("conversion verifies tokens, derives gate status, and records once per user", async () => {
 	const t = setup();

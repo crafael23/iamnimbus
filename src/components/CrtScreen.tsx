@@ -71,8 +71,7 @@ export function CrtScreen({ children }: { children: ReactNode }) {
 		const el = screen.current;
 		if (!el) return;
 		const ua = navigator.userAgent;
-		const webkit =
-			/iP(hone|ad|od)/.test(ua) || (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua));
+		const webkit = /iP(hone|ad|od)/.test(ua) || (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua));
 		if (webkit) return;
 		const wide = window.matchMedia("(min-width: 768px) and (pointer: fine)");
 		const raf = { id: 0 };
@@ -98,11 +97,7 @@ export function CrtScreen({ children }: { children: ReactNode }) {
 
 	return (
 		<>
-			<div
-				ref={screen}
-				className="crt-screen"
-				style={curved ? { filter: "url(#crt-curve)" } : undefined}
-			>
+			<div ref={screen} className="crt-screen" style={curved ? { filter: "url(#crt-curve)" } : undefined}>
 				<div aria-hidden className="crt-grid" data-quiet={quiet || undefined} />
 				<div ref={scroller} className="crt-scroll">
 					{children}

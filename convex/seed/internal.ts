@@ -32,8 +32,7 @@ const SAMPLE_PROJECT = {
 const SAMPLE_POST = {
 	slug: "sample-writing-is-infrastructure",
 	title: "SAMPLE: Writing is infrastructure",
-	excerpt:
-		"Sample post. Why every published post here is also a memory for the terminal.",
+	excerpt: "Sample post. Why every published post here is also a memory for the terminal.",
 	content: `> **SAMPLE POST.** Seeded to demonstrate the blog. Remove it with \`npx convex run seed/internal:clear\`.
 
 On this site, publishing a post does two things in one transaction: the post becomes public, and it is queued for ingestion into the knowledge base the terminal reads from. Unpublishing reverses both.

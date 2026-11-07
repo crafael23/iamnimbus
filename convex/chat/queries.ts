@@ -4,12 +4,7 @@ import { v } from "convex/values";
 import { components } from "../_generated/api";
 import { query } from "../_generated/server";
 import { GUEST_NOTICE_AT } from "../_lib/rateLimits";
-import {
-	authorizeThreadAccess,
-	limitFor,
-	remainingMessages,
-	resolveChatOwner,
-} from "./threads";
+import { authorizeThreadAccess, limitFor, remainingMessages, resolveChatOwner } from "./threads";
 
 /**
  * Messages with live stream deltas, for the owner of the thread only.

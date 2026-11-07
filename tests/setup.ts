@@ -8,11 +8,7 @@ import schema from "../convex/schema";
 export const TEST_SECRET = "test-guest-token-secret-0123456789abcdef";
 process.env.GUEST_TOKEN_SECRET = TEST_SECRET;
 
-export const modules = import.meta.glob([
-	"../convex/**/*.ts",
-	"../convex/**/*.js",
-	"!../convex/**/*.d.ts",
-]);
+export const modules = import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"]);
 
 export function setup() {
 	const t = convexTest(schema, modules);
@@ -51,7 +47,5 @@ export async function asUser(t: T, subject: string, role?: string) {
 }
 
 export async function scheduled(t: T) {
-	return await t.run(async (ctx) =>
-		ctx.db.system.query("_scheduled_functions").collect(),
-	);
+	return await t.run(async (ctx) => ctx.db.system.query("_scheduled_functions").collect());
 }

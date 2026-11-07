@@ -45,13 +45,10 @@ async function hmacKey(secret: string) {
 	if (secret.length < 32) {
 		throw new Error("GUEST_TOKEN_SECRET must be at least 32 characters");
 	}
-	return await crypto.subtle.importKey(
-		"raw",
-		encoder.encode(secret),
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["sign", "verify"],
-	);
+	return await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
+		"sign",
+		"verify",
+	]);
 }
 
 async function sign(secret: string, payload: CookiePayload | AccessPayload) {
@@ -66,12 +63,7 @@ async function open(secret: string, token: string): Promise<unknown> {
 	const macBytes = fromBase64Url(mac);
 	const bodyBytes = fromBase64Url(body);
 	if (!macBytes || !bodyBytes) return null;
-	const ok = await crypto.subtle.verify(
-		"HMAC",
-		await hmacKey(secret),
-		macBytes,
-		encoder.encode(body),
-	);
+	const ok = await crypto.subtle.verify("HMAC", await hmacKey(secret), macBytes, encoder.encode(body));
 	if (!ok) return null;
 	try {
 		return JSON.parse(new TextDecoder().decode(bodyBytes));
@@ -88,22 +80,13 @@ export async function signGuestCookie(secret: string, sub: string, now: number) 
 	return await sign(secret, { k: "c", sub, exp: now + COOKIE_TTL_MS });
 }
 
-export async function signGuestAccess(
-	secret: string,
-	sub: string,
-	net: string,
-	now: number,
-) {
+export async function signGuestAccess(secret: string, sub: string, net: string, now: number) {
 	const exp = now + ACCESS_TTL_MS;
 	return { token: await sign(secret, { k: "a", sub, net, exp }), exp };
 }
 
 /** The guest id in a valid, unexpired cookie token, else null. */
-export async function readGuestCookie(
-	secret: string,
-	token: string | undefined,
-	now: number,
-): Promise<string | null> {
+export async function readGuestCookie(secret: string, token: string | undefined, now: number): Promise<string | null> {
 	if (!token) return null;
 	const p = (await open(secret, token)) as Partial<CookiePayload> | null;
 	if (p?.k !== "c" || typeof p.sub !== "string" || !UUID.test(p.sub)) return null;
@@ -115,10 +98,7 @@ export async function readGuestCookie(
  * A signature-valid access token, or null. Expiry is checked by the caller,
  * because reads accept an older token than writes do.
  */
-export async function readGuestAccess(
-	secret: string,
-	token: string,
-): Promise<GuestAccess | null> {
+export async function readGuestAccess(secret: string, token: string): Promise<GuestAccess | null> {
 	const p = (await open(secret, token)) as Partial<AccessPayload> | null;
 	if (p?.k !== "a" || typeof p.sub !== "string" || !UUID.test(p.sub)) return null;
 	if (typeof p.net !== "string" || !p.net || typeof p.exp !== "number") return null;
@@ -130,7 +110,12 @@ export async function readGuestAccess(
  * IPv4-mapped IPv6), the /64 for IPv6. Unparseable input maps to itself.
  */
 export function networkPrefix(address: string): string {
-	const ip = address.trim().toLowerCase().replace(/^\[|\]$/g, "").split("%")[0] ?? "";
+	const ip =
+		address
+			.trim()
+			.toLowerCase()
+			.replace(/^\[|\]$/g, "")
+			.split("%")[0] ?? "";
 	const v4 = ip.match(/^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
 	if (v4) return `${v4[1]}.${v4[2]}.${v4[3]}.0/24`;
 	if (ip.includes(":")) {
@@ -146,10 +131,6 @@ export function networkPrefix(address: string): string {
 
 /** Keyed hash of a network prefix: stable per network, not reversible. */
 export async function hashNetwork(secret: string, prefix: string) {
-	const mac = await crypto.subtle.sign(
-		"HMAC",
-		await hmacKey(secret),
-		encoder.encode(`net:${prefix}`),
-	);
+	const mac = await crypto.subtle.sign("HMAC", await hmacKey(secret), encoder.encode(`net:${prefix}`));
 	return toBase64Url(new Uint8Array(mac).slice(0, 16));
 }

@@ -22,9 +22,7 @@ export async function getCurrentUser(ctx: Ctx): Promise<Doc<"users">> {
 	return user;
 }
 
-export async function getCurrentUserOrNull(
-	ctx: Ctx,
-): Promise<Doc<"users"> | null> {
+export async function getCurrentUserOrNull(ctx: Ctx): Promise<Doc<"users"> | null> {
 	const identity = await ctx.auth.getUserIdentity();
 	if (!identity) {
 		return null;

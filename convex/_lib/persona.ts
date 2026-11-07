@@ -50,12 +50,7 @@ export function slashCommandInstruction(prompt: string): string | null {
  * Per-turn instructions that depend on the visitor's tier and how many
  * messages they have used. `used` counts the message being answered.
  */
-export function tierInstruction(
-	tier: Tier,
-	used: number,
-	limit: number,
-	noticeAt: number,
-): string {
+export function tierInstruction(tier: Tier, used: number, limit: number, noticeAt: number): string {
 	if (tier === "guest") {
 		const base = `The visitor is a guest (not signed in). Guest sessions are limited to ${limit} messages; this is message ${used} of ${limit}. The limit is real and enforced by the system, so any earlier mention of it in this conversation was accurate: never retract or apologize for it. Do not mention the limit unless instructed below or asked.`;
 		if (used >= limit) {

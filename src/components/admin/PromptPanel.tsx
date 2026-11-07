@@ -95,7 +95,11 @@ function PromptEditor({ versions }: { versions: Version[] }) {
 									{v.note && <span className="mt-1 block text-[12px] text-fog">{v.note}</span>}
 								</button>
 								{viewing === v._id && !v.active && (
-									<Button className="mt-2" disabled={busy} onClick={() => void run(() => restore({ versionId: v._id }))}>
+									<Button
+										className="mt-2"
+										disabled={busy}
+										onClick={() => void run(() => restore({ versionId: v._id }))}
+									>
 										Restore v{v.number}
 									</Button>
 								)}

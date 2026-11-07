@@ -39,13 +39,9 @@ export const statusForSource = adminQuery({
 	handler: async (ctx, { source, sourceKey }) => {
 		const doc = await ctx.db
 			.query("knowledgeDocs")
-			.withIndex("by_source", (q) =>
-				q.eq("source", source).eq("sourceKey", sourceKey),
-			)
+			.withIndex("by_source", (q) => q.eq("source", source).eq("sourceKey", sourceKey))
 			.unique();
-		return doc
-			? { status: doc.status, chunkCount: doc.chunkCount ?? null, error: doc.error ?? null }
-			: null;
+		return doc ? { status: doc.status, chunkCount: doc.chunkCount ?? null, error: doc.error ?? null } : null;
 	},
 });
 

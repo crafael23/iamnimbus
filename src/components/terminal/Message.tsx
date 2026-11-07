@@ -23,19 +23,11 @@ export function UserLine({ text, handle }: { text: string; handle: string }) {
  * while it streams. The cursor advances while streaming, then blinks once and
  * holds on the latest reply.
  */
-export function ProgramReply({
-	message,
-	isLatest,
-}: {
-	message: UIMessage;
-	isLatest: boolean;
-}) {
+export function ProgramReply({ message, isLatest }: { message: UIMessage; isLatest: boolean }) {
 	const streaming = message.status === "streaming" || message.status === "pending";
 	// Replies arrive whole once the safety check passes; type out the ones that
 	// land while the visitor is here (older ones on reload appear at once).
-	const [fresh] = useState(
-		() => isLatest && Date.now() - message._creationTime < 30_000,
-	);
+	const [fresh] = useState(() => isLatest && Date.now() - message._creationTime < 30_000);
 	const [visible, { isStreaming }] = useSmoothText(message.text, {
 		startStreaming: streaming || fresh,
 	});
@@ -45,22 +37,13 @@ export function ProgramReply({
 	return (
 		<div className={`line-in mt-3 pl-[2ch] ${TEXT}`}>
 			{visible ? (
-				<Markdown
-					variant="terminal"
-					cursor={
-						isLatest && !failed ? (typing ? "typing" : "settled") : undefined
-					}
-				>
+				<Markdown variant="terminal" cursor={isLatest && !failed ? (typing ? "typing" : "settled") : undefined}>
 					{visible}
 				</Markdown>
 			) : isLatest && !failed ? (
 				<span aria-hidden className="cursor-block cursor-blink" />
 			) : null}
-			{failed && (
-				<p className="mt-2 uppercase text-danger">
-					{"// "}transmission lost. Send the message again.
-				</p>
-			)}
+			{failed && <p className="mt-2 uppercase text-danger">{"// "}transmission lost. Send the message again.</p>}
 		</div>
 	);
 }

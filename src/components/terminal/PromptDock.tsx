@@ -1,14 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-	type KeyboardEvent,
-	type RefObject,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { type CommandSpec, matchCommands } from "./commands";
 
 /**
@@ -198,9 +191,7 @@ function CommandList({
 					>
 						<span className="w-[10ch] shrink-0">{c.name}</span>
 						<span className={i === selected ? "" : "text-dim"}>{c.hint}</span>
-						{c.local && (
-							<span className={`ml-auto uppercase ${i === selected ? "" : "text-dim/70"}`}>local</span>
-						)}
+						{c.local && <span className={`ml-auto uppercase ${i === selected ? "" : "text-dim/70"}`}>local</span>}
 					</button>
 				</li>
 			))}

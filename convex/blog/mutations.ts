@@ -12,11 +12,7 @@ const vPostFields = {
 	content: v.string(),
 };
 
-async function assertSlugFree(
-	ctx: MutationCtx,
-	slug: string,
-	postId?: Id<"blogPosts">,
-) {
+async function assertSlugFree(ctx: MutationCtx, slug: string, postId?: Id<"blogPosts">) {
 	assertSlug(slug);
 	const clash = await ctx.db
 		.query("blogPosts")
@@ -28,9 +24,7 @@ async function assertSlugFree(
 }
 
 function knowledgeContent(post: Doc<"blogPosts">) {
-	const date = post.publishedAt
-		? new Date(post.publishedAt).toISOString().slice(0, 10)
-		: "";
+	const date = post.publishedAt ? new Date(post.publishedAt).toISOString().slice(0, 10) : "";
 	return `Blog post published ${date} at /blog/${post.slug}\n\n${post.excerpt}\n\n${post.content}`;
 }
 

@@ -12,7 +12,7 @@ import { ProjectsPanel } from "./ProjectsPanel";
 import { PromptPanel } from "./PromptPanel";
 
 const SECTIONS = [
- { id: "analytics", label: "Analytics" },
+	{ id: "analytics", label: "Analytics" },
 	{ id: "knowledge", label: "Knowledge" },
 	{ id: "blog", label: "Blog" },
 	{ id: "projects", label: "Projects" },
@@ -63,9 +63,7 @@ export function AdminApp() {
 											aria-current={section === s.id ? "page" : undefined}
 											onClick={() => setSection(s.id)}
 											className={`-mb-px whitespace-nowrap border-b px-3 py-2 text-[13px] transition-colors lg:-ml-px lg:mb-0 lg:w-full lg:border-b-0 lg:border-l lg:text-left ${
-												section === s.id
-													? "border-cyan text-cyan"
-													: "border-transparent text-dim hover:text-ice"
+												section === s.id ? "border-cyan text-cyan" : "border-transparent text-dim hover:text-ice"
 											}`}
 										>
 											{s.label}
@@ -80,7 +78,7 @@ export function AdminApp() {
 							{section === "projects" && <ProjectsPanel />}
 							{section === "prompt" && <PromptPanel />}
 							{section === "github" && <GithubPanel />}
- {section === "analytics" && <AnalyticsPanel />}
+							{section === "analytics" && <AnalyticsPanel />}
 						</main>
 					</>
 				)}

@@ -74,9 +74,7 @@ describe("blog publishing and the knowledge base", () => {
 		docs = await blogDocs(t);
 		expect(docs).toHaveLength(0);
 		// Until the scheduled vector removal runs, search drops hits for the gone doc.
-		expect(
-			await t.query(internal.knowledge.queries.existingDocIds, { keys: [publishedDocId, "junk"] }),
-		).toEqual([]);
+		expect(await t.query(internal.knowledge.queries.existingDocIds, { keys: [publishedDocId, "junk"] })).toEqual([]);
 		const removal = (await scheduled(t)).find((j) => j.name.includes("removeFromIndex"));
 		expect(removal?.args[0]).toMatchObject({ namespace: "blog", key: expect.any(String) });
 	});

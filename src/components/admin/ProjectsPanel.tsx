@@ -132,11 +132,21 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 					onChange={(next) => setForm({ ...form, ...next })}
 				/>
 				<Field label="Summary" htmlFor="p-summary" hint="One sentence for the index card.">
-					<input id="p-summary" value={form.summary} onChange={(e) => set("summary")(e.target.value)} className={inputClass} />
+					<input
+						id="p-summary"
+						value={form.summary}
+						onChange={(e) => set("summary")(e.target.value)}
+						className={inputClass}
+					/>
 				</Field>
 				<div className="grid gap-5 sm:grid-cols-[1fr_7rem_7rem]">
 					<Field label="Stack" htmlFor="p-stack" hint="Comma separated.">
-						<input id="p-stack" value={form.stack} onChange={(e) => set("stack")(e.target.value)} className={inputClass} />
+						<input
+							id="p-stack"
+							value={form.stack}
+							onChange={(e) => set("stack")(e.target.value)}
+							className={inputClass}
+						/>
 					</Field>
 					<Field label="Year" htmlFor="p-year">
 						<input id="p-year" value={form.year} onChange={(e) => set("year")(e.target.value)} className={inputClass} />
@@ -154,11 +164,23 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 				<div className="grid gap-5 sm:grid-cols-2">
 					<RepoPicker projectId={project?._id} value={form.githubRepo} onChange={set("githubRepo")} />
 					<Field label="Live URL" htmlFor="p-live">
-						<input id="p-live" value={form.liveUrl} onChange={(e) => set("liveUrl")(e.target.value)} placeholder="https://" className={inputClass} />
+						<input
+							id="p-live"
+							value={form.liveUrl}
+							onChange={(e) => set("liveUrl")(e.target.value)}
+							placeholder="https://"
+							className={inputClass}
+						/>
 					</Field>
 					{!form.githubRepo && (
 						<Field label="Other repository URL" htmlFor="p-repo" hint="For code that is not in your GitHub sync.">
-							<input id="p-repo" value={form.repoUrl} onChange={(e) => set("repoUrl")(e.target.value)} placeholder="https://" className={inputClass} />
+							<input
+								id="p-repo"
+								value={form.repoUrl}
+								onChange={(e) => set("repoUrl")(e.target.value)}
+								placeholder="https://"
+								className={inputClass}
+							/>
 						</Field>
 					)}
 				</div>
@@ -193,7 +215,8 @@ function RepoPicker({
 	onChange: (value: string) => void;
 }) {
 	const repos = useQuery(api.github.queries.repos);
-	const takenBy = (r: SyncedRepo) => (r.linkedProject && r.linkedProject._id !== projectId ? r.linkedProject.title : null);
+	const takenBy = (r: SyncedRepo) =>
+		r.linkedProject && r.linkedProject._id !== projectId ? r.linkedProject.title : null;
 	const missing = Boolean(value) && repos !== undefined && !repos.some((r) => r.fullName === value);
 
 	return (

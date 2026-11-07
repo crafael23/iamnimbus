@@ -3,11 +3,7 @@
 import { ReactNode, useCallback, useState } from "react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithAuth } from "convex/react";
-import {
-	AuthKitProvider,
-	useAuth,
-	useAccessToken,
-} from "@workos-inc/authkit-nextjs/components";
+import { AuthKitProvider, useAuth, useAccessToken } from "@workos-inc/authkit-nextjs/components";
 
 /**
  * Convex calls this hook itself, inside its provider. It is handed over on an
@@ -35,9 +31,7 @@ function useAuthFromAuthKit() {
 	const isAuthenticated = !!user;
 
 	const fetchAccessToken = useCallback(
-		async ({
-			forceRefreshToken,
-		}: { forceRefreshToken?: boolean } = {}): Promise<string | null> => {
+		async ({ forceRefreshToken }: { forceRefreshToken?: boolean } = {}): Promise<string | null> => {
 			if (!user) {
 				return null;
 			}

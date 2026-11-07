@@ -44,7 +44,9 @@ export const applySync = internalMutation({
 		);
 
 		const rows = await ctx.db.query("githubRepos").collect();
-		await Promise.all(rows.filter((row) => !byKey.has(row.fullName)).map((row) => ctx.db.delete("githubRepos", row._id)));
+		await Promise.all(
+			rows.filter((row) => !byKey.has(row.fullName)).map((row) => ctx.db.delete("githubRepos", row._id)),
+		);
 		const docs = await ctx.db
 			.query("knowledgeDocs")
 			.withIndex("by_source", (q) => q.eq("source", "github"))

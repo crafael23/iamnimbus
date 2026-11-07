@@ -2,12 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalMutation } from "../_generated/server";
 import { adminMutation } from "../_lib/customFunctions";
-import {
-	createKnowledgeDoc,
-	deleteKnowledgeDoc,
-	reingestKnowledgeDoc,
-	updateKnowledgeDoc,
-} from "../_lib/knowledge";
+import { createKnowledgeDoc, deleteKnowledgeDoc, reingestKnowledgeDoc, updateKnowledgeDoc } from "../_lib/knowledge";
 import { vAsOf, type AsOf } from "../_lib/asOf";
 import { vNamespace } from "../_lib/rag";
 

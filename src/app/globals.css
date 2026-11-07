@@ -90,7 +90,9 @@
 @keyframes bleed-in {
 	0% {
 		opacity: 0;
-		font-variation-settings: "BLED" 100, "SCAN" 100;
+		font-variation-settings:
+			"BLED" 100,
+			"SCAN" 100;
 		letter-spacing: 0.3em;
 		filter: blur(6px) brightness(2);
 	}
@@ -98,12 +100,16 @@
 		opacity: 1;
 	}
 	70% {
-		font-variation-settings: "BLED" 22, "SCAN" 40;
+		font-variation-settings:
+			"BLED" 22,
+			"SCAN" 40;
 		filter: blur(0.6px) brightness(1.3);
 	}
 	100% {
 		opacity: 1;
-		font-variation-settings: "BLED" 8, "SCAN" 18;
+		font-variation-settings:
+			"BLED" 8,
+			"SCAN" 18;
 		letter-spacing: 0;
 		filter: none;
 	}
@@ -312,7 +318,9 @@
 
 /* Sixtyfour's scanline axis, held slightly open for display type. */
 .scanned {
-	font-variation-settings: "BLED" 8, "SCAN" 18;
+	font-variation-settings:
+		"BLED" 8,
+		"SCAN" 18;
 }
 
 /* ------------------------------------------------------------------ */
@@ -368,16 +376,8 @@
 	bottom: 0;
 	height: 300%;
 	background-image:
-		linear-gradient(
-			to right,
-			color-mix(in oklab, var(--color-cyan) 75%, transparent) 1.5px,
-			transparent 1.5px
-		),
-		linear-gradient(
-			to bottom,
-			color-mix(in oklab, var(--color-cyan) 75%, transparent) 1.5px,
-			transparent 1.5px
-		);
+		linear-gradient(to right, color-mix(in oklab, var(--color-cyan) 75%, transparent) 1.5px, transparent 1.5px),
+		linear-gradient(to bottom, color-mix(in oklab, var(--color-cyan) 75%, transparent) 1.5px, transparent 1.5px);
 	background-size: 72px 72px;
 	background-position: center bottom;
 	transform: perspective(600px) rotateX(60deg);
@@ -416,24 +416,13 @@
 	pointer-events: none;
 	background:
 		radial-gradient(ellipse 55% 38% at 30% 16%, rgb(255 255 255 / 0.045), transparent 70%),
-		radial-gradient(
-			ellipse 105% 100% at 50% 50%,
-			transparent 50%,
-			rgb(0 0 0 / 0.45) 78%,
-			rgb(0 0 0 / 0.9) 100%
-		),
+		radial-gradient(ellipse 105% 100% at 50% 50%, transparent 50%, rgb(0 0 0 / 0.45) 78%, rgb(0 0 0 / 0.9) 100%),
 		radial-gradient(
 			ellipse 120% 90% at 50% 50%,
 			color-mix(in oklab, var(--color-cyan) 5%, transparent),
 			transparent 65%
 		),
-		repeating-linear-gradient(
-			to bottom,
-			transparent 0,
-			transparent 2px,
-			rgb(0 0 0 / 0.2) 2px,
-			rgb(0 0 0 / 0.2) 3px
-		);
+		repeating-linear-gradient(to bottom, transparent 0, transparent 2px, rgb(0 0 0 / 0.2) 2px, rgb(0 0 0 / 0.2) 3px);
 	box-shadow: inset 0 0 80px 18px rgb(0 0 0 / 0.75);
 }
 .crt-overlay[data-quiet] {

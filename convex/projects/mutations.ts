@@ -49,11 +49,7 @@ function knowledgeContent(p: ProjectFields) {
 		.join("\n\n");
 }
 
-async function validate(
-	ctx: MutationCtx,
-	fields: ProjectFields,
-	projectId?: Doc<"projects">["_id"],
-) {
+async function validate(ctx: MutationCtx, fields: ProjectFields, projectId?: Doc<"projects">["_id"]) {
 	if (!fields.title.trim()) throw new ConvexError("Title is required");
 	assertSlug(fields.slug);
 	for (const url of [fields.repoUrl, fields.liveUrl]) {

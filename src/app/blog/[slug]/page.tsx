@@ -14,9 +14,7 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { slug } = await params;
 	const post = await fetchQuery(api.blog.queries.getPublishedBySlug, { slug });
-	return post
-		? { title: post.title, description: post.excerpt }
-		: { title: "Not found" };
+	return post ? { title: post.title, description: post.excerpt } : { title: "Not found" };
 }
 
 export default async function BlogPost({ params }: Props) {
@@ -27,7 +25,10 @@ export default async function BlogPost({ params }: Props) {
 	return (
 		<PageShell>
 			<article className="mx-auto max-w-[68ch]">
-				<Link href="/blog" className="font-crt text-[18px] uppercase tracking-[0.1em] text-dim transition-colors hover:text-cyan">
+				<Link
+					href="/blog"
+					className="font-crt text-[18px] uppercase tracking-[0.1em] text-dim transition-colors hover:text-cyan"
+				>
 					{"< writing"}
 				</Link>
 				<header className="mt-8 border-b border-dashed border-line-strong pb-8">

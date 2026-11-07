@@ -210,7 +210,12 @@ function PostActions({
 					<UnpublishButton busy={busy} postId={postId} run={run} />
 				)}
 				{status === "published" && liveSlug !== undefined && (
-					<a href={`/blog/${liveSlug}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center px-2 text-[13px] text-cyan hover:text-ice">
+					<a
+						href={`/blog/${liveSlug}`}
+						target="_blank"
+						rel="noreferrer"
+						className="inline-flex h-9 items-center px-2 text-[13px] text-cyan hover:text-ice"
+					>
 						View post ↗
 					</a>
 				)}
@@ -255,7 +260,10 @@ function PublishButton({
 function UnpublishButton({ busy, postId, run }: { busy: string | null; postId: Id<"blogPosts"> | null; run: Run }) {
 	const unpublish = useMutation(api.blog.mutations.unpublish);
 	return (
-		<Button disabled={Boolean(busy) || !postId} onClick={() => postId && void run("unpublish", () => unpublish({ postId }))}>
+		<Button
+			disabled={Boolean(busy) || !postId}
+			onClick={() => postId && void run("unpublish", () => unpublish({ postId }))}
+		>
 			{busy === "unpublish" ? "Unpublishing…" : "Unpublish"}
 		</Button>
 	);

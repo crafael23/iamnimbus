@@ -26,9 +26,7 @@ export const repos = adminQuery({
 			ctx.db.query("githubRepos").collect(),
 			ctx.db.query("projects").take(500),
 		]);
-		const linked = new Map(
-			projects.flatMap((p) => (p.githubRepo ? [[repoKey(p.githubRepo), p] as const] : [])),
-		);
+		const linked = new Map(projects.flatMap((p) => (p.githubRepo ? [[repoKey(p.githubRepo), p] as const] : [])));
 		return rows
 			.sort((a, b) => b.pushedAt - a.pushedAt)
 			.map((r) => {

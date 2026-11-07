@@ -14,10 +14,7 @@ type Namespace = (typeof NAMESPACES)[number];
 export function KnowledgePanel() {
 	const [filter, setFilter] = useState<Namespace | "all">("all");
 	const [editing, setEditing] = useState<Id<"knowledgeDocs"> | "new" | null>(null);
-	const docs = useQuery(
-		api.knowledge.queries.list,
-		filter === "all" ? {} : { namespace: filter },
-	);
+	const docs = useQuery(api.knowledge.queries.list, filter === "all" ? {} : { namespace: filter });
 	const reingest = useMutation(api.knowledge.mutations.reingest);
 	const remove = useMutation(api.knowledge.mutations.remove);
 	const [error, setError] = useState<string | null>(null);
@@ -46,9 +43,7 @@ export function KnowledgePanel() {
 						aria-pressed={filter === ns}
 						onClick={() => setFilter(ns)}
 						className={`border px-2.5 py-1 text-[12px] transition-colors ${
-							filter === ns
-								? "border-cyan/60 text-cyan"
-								: "border-line text-dim hover:text-ice"
+							filter === ns ? "border-cyan/60 text-cyan" : "border-line text-dim hover:text-ice"
 						}`}
 					>
 						{ns}
@@ -60,8 +55,8 @@ export function KnowledgePanel() {
 				<SkeletonRows />
 			) : docs.length === 0 ? (
 				<p className="border border-dashed border-line p-8 text-[13px] text-fog">
-					No documents in {filter === "all" ? "the knowledge base" : filter} yet.
-					Write one with <span className="text-cyan">New document</span>.
+					No documents in {filter === "all" ? "the knowledge base" : filter} yet. Write one with{" "}
+					<span className="text-cyan">New document</span>.
 				</p>
 			) : (
 				<ul className="divide-y divide-line border-y border-line">
@@ -114,17 +109,8 @@ export function KnowledgePanel() {
 	);
 }
 
-function KnowledgeEditor({
-	docId,
-	onClose,
-}: {
-	docId: Id<"knowledgeDocs"> | "new";
-	onClose: () => void;
-}) {
-	const existing = useQuery(
-		api.knowledge.queries.get,
-		docId === "new" ? "skip" : { docId },
-	);
+function KnowledgeEditor({ docId, onClose }: { docId: Id<"knowledgeDocs"> | "new"; onClose: () => void }) {
+	const existing = useQuery(api.knowledge.queries.get, docId === "new" ? "skip" : { docId });
 	if (docId !== "new" && existing === undefined) return <SkeletonRows />;
 	return (
 		<KnowledgeForm

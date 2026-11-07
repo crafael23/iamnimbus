@@ -29,10 +29,7 @@ export const eventFields = {
 export const utcDay = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 export async function recordEvent(
 	ctx: MutationCtx,
-	event: Omit<
-		import("../_generated/dataModel").Doc<"analyticsEvents">,
-		"_id" | "_creationTime" | "day"
-	>,
+	event: Omit<import("../_generated/dataModel").Doc<"analyticsEvents">, "_id" | "_creationTime" | "day">,
 ) {
 	await ctx.db.insert("analyticsEvents", { day: utcDay(), ...event });
 }

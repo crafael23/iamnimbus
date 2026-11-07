@@ -71,9 +71,7 @@ async function getReadme(fullName: string): Promise<string | null> {
 	if (res.status === 404) return null;
 	if (!res.ok) throw failure(res, url);
 	const text = await res.text();
-	return text.length > MAX_README_CHARS
-		? `${text.slice(0, MAX_README_CHARS)}\n\n[README truncated]`
-		: text;
+	return text.length > MAX_README_CHARS ? `${text.slice(0, MAX_README_CHARS)}\n\n[README truncated]` : text;
 }
 
 /** Whether `username` authored at least one commit in the repo. */
@@ -119,9 +117,7 @@ async function organizations(username: string) {
 		.split(",")
 		.map((o) => o.trim())
 		.filter(Boolean);
-	const memberships = await getJson<{ login: string }[]>(
-		`${API}/users/${encodeURIComponent(username)}/orgs`,
-	);
+	const memberships = await getJson<{ login: string }[]>(`${API}/users/${encodeURIComponent(username)}/orgs`);
 	const seen = new Map<string, string>();
 	for (const login of [...configured, ...memberships.map((m) => m.login)]) {
 		if (!seen.has(login.toLowerCase())) seen.set(login.toLowerCase(), login);
@@ -142,24 +138,18 @@ export const sync = adminAction({
 		if (!username) throw new ConvexError("GITHUB_USERNAME is not set");
 		try {
 			const own = (
-				await getAll<GithubRepo>(
-					`${API}/users/${encodeURIComponent(username)}/repos?type=owner&sort=pushed`,
-				)
+				await getAll<GithubRepo>(`${API}/users/${encodeURIComponent(username)}/repos?type=owner&sort=pushed`)
 			).filter(isPublicSource);
 
 			const orgs = await organizations(username);
 			const orgRepos = (
 				await Promise.all(
-					orgs.map((org) =>
-						getAll<GithubRepo>(`${API}/orgs/${encodeURIComponent(org)}/repos?type=public&sort=pushed`),
-					),
+					orgs.map((org) => getAll<GithubRepo>(`${API}/orgs/${encodeURIComponent(org)}/repos?type=public&sort=pushed`)),
 				)
 			)
 				.flat()
 				.filter(isPublicSource);
-			const authored = await mapLimit(orgRepos, CONCURRENCY, (r) =>
-				hasCommitsBy(r.full_name, username),
-			);
+			const authored = await mapLimit(orgRepos, CONCURRENCY, (r) => hasCommitsBy(r.full_name, username));
 			const contributed = orgRepos.filter((_, i) => authored[i]);
 
 			const byKey = new Map<string, GithubRepo>();
@@ -180,11 +170,7 @@ export const sync = adminAction({
 					url: repo.html_url,
 					description: repo.description ?? undefined,
 					homepage: repo.homepage || undefined,
-					languages: shares.length
-						? shares
-						: repo.language
-							? [{ name: repo.language, percent: 100 }]
-							: [],
+					languages: shares.length ? shares : repo.language ? [{ name: repo.language, percent: 100 }] : [],
 					topics: repo.topics ?? [],
 					stars: repo.stargazers_count,
 					forks: repo.forks_count,

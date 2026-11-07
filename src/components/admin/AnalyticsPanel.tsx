@@ -42,14 +42,8 @@ export function AnalyticsPanel() {
 							["Guest allowances exhausted", data.reachedLimit],
 							["Conversions", data.conversions],
 							["Conversions / guest sessions", percent(data.conversions, data.sessions.guest)],
-							[
-								"Conversions from limit gate",
-								`${data.atGate} (${percent(data.atGate, data.conversions)})`,
-							],
-							[
-								"AI spend this month / budget",
-								`$${data.monthSpend.toFixed(2)} / $${data.monthBudget.toFixed(2)}`,
-							],
+							["Conversions from limit gate", `${data.atGate} (${percent(data.atGate, data.conversions)})`],
+							["AI spend this month / budget", `$${data.monthSpend.toFixed(2)} / $${data.monthBudget.toFixed(2)}`],
 						].map(([label, value]) => (
 							<div key={label}>
 								<dt className="text-dim">{label}</dt>
@@ -58,9 +52,8 @@ export function AnalyticsPanel() {
 						))}
 					</dl>
 					<p className="mt-6 text-[12px] text-dim">
-						Limit counts measure successful messages that exhaust the guest allowance. Network
-						refusals are not counted. Conversion rates compare events in this window, not a signup
-						cohort.
+						Limit counts measure successful messages that exhaust the guest allowance. Network refusals are not counted.
+						Conversion rates compare events in this window, not a signup cohort.
 					</p>
 					<h2 className="mt-8 text-sm text-ice">Most asked topics</h2>
 					<div className="mt-4 space-y-3">

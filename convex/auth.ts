@@ -14,52 +14,48 @@ export const authKit = new AuthKit<DataModel>(components.workOSAuthKit, {
 
 export const { authKitEvent } = authKit.events({
 	"user.created": async (ctx, event) => {
-    const name =
-      [event.data.firstName, event.data.lastName]
-        .filter(Boolean)
-        .join(" ") ||
-      event.data.email?.split("@")[0] ||
-      "User";
+		const name =
+			[event.data.firstName, event.data.lastName].filter(Boolean).join(" ") ||
+			event.data.email?.split("@")[0] ||
+			"User";
 
 		await ctx.db.insert("users", {
-      authId: event.data.id,
-      tokenIdentifier: event.data.id,
-      name,
-      email: event.data.email ?? "",
-      pictureUrl: event.data.profilePictureUrl ?? undefined,
-      createdAt: Date.now(),
-    });
+			authId: event.data.id,
+			tokenIdentifier: event.data.id,
+			name,
+			email: event.data.email ?? "",
+			pictureUrl: event.data.profilePictureUrl ?? undefined,
+			createdAt: Date.now(),
+		});
 
-    // Auto-add new signups to the app's default organization (e.g. iamnimbus)
-    // Requires WORKOS_ORG_ID to be set in Convex env
-    await ctx.scheduler.runAfter(0, internal.authInternal.addUserToOrganization, {
-      workosUserId: event.data.id,
-    });
-  },
-  "user.updated": async (ctx, event) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_authId", (q) => q.eq("authId", event.data.id))
-      .unique();
+		// Auto-add new signups to the app's default organization (e.g. iamnimbus)
+		// Requires WORKOS_ORG_ID to be set in Convex env
+		await ctx.scheduler.runAfter(0, internal.authInternal.addUserToOrganization, {
+			workosUserId: event.data.id,
+		});
+	},
+	"user.updated": async (ctx, event) => {
+		const user = await ctx.db
+			.query("users")
+			.withIndex("by_authId", (q) => q.eq("authId", event.data.id))
+			.unique();
 
-    if (!user) {
-      return;
-    }
+		if (!user) {
+			return;
+		}
 
-    const name =
-      [event.data.firstName, event.data.lastName]
-        .filter(Boolean)
-        .join(" ") ||
-      event.data.email?.split("@")[0] ||
-      user.name;
+		const name =
+			[event.data.firstName, event.data.lastName].filter(Boolean).join(" ") ||
+			event.data.email?.split("@")[0] ||
+			user.name;
 
-    await ctx.db.patch("users", user._id, {
-      email: event.data.email ?? user.email,
-      name,
-      pictureUrl: event.data.profilePictureUrl ?? user.pictureUrl,
-      updatedAt: Date.now(),
-    });
-  },
+		await ctx.db.patch("users", user._id, {
+			email: event.data.email ?? user.email,
+			name,
+			pictureUrl: event.data.profilePictureUrl ?? user.pictureUrl,
+			updatedAt: Date.now(),
+		});
+	},
 	"user.deleted": async (ctx, event) => {
 		const user = await ctx.db
 			.query("users")

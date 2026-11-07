@@ -1,13 +1,6 @@
 import { useUIMessages } from "@convex-dev/agent/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import {
-	useCallback,
-	useEffect,
-	useEffectEvent,
-	useRef,
-	useState,
-	useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import { api } from "../../../convex/_generated/api";
 import { guestToken } from "./guestToken";
 import { hasBooted, markBooted, savedGuestThread, saveGuestThread } from "./storage";

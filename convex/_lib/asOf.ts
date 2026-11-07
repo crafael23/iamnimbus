@@ -27,10 +27,7 @@ export function recency(asOf: AsOf | undefined, now: number) {
  * Re-rank search hits so recent work wins close calls. Relevance still leads:
  * a clearly better match from years ago keeps its place over a vague current one.
  */
-export function rankByRecency<T extends { score: number; asOf?: AsOf }>(
-	hits: T[],
-	now: number,
-): T[] {
+export function rankByRecency<T extends { score: number; asOf?: AsOf }>(hits: T[], now: number): T[] {
 	const weighted = (h: T) => h.score * (1 - RECENCY_SHARE + RECENCY_SHARE * recency(h.asOf, now));
 	return [...hits].sort((a, b) => weighted(b) - weighted(a));
 }

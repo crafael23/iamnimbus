@@ -70,8 +70,7 @@ export async function checkContent(gate: Gate, state: Record<string, string>): P
 		const answer = result.answers.attack;
 		const probability = answer.type === "boolean" ? answer.probability : 1;
 		const topicAnswer = result.answers.topic;
-		const topic =
-			topicAnswer?.type === "choice" ? topics.find((t) => t === topicAnswer.choice) : undefined;
+		const topic = topicAnswer?.type === "choice" ? topics.find((t) => t === topicAnswer.choice) : undefined;
 		const meta = result.providerMetadata?.convexGateway as { cost?: number } | undefined;
 		return {
 			...(topic ? { topic } : {}),

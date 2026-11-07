@@ -6,10 +6,7 @@ import { findRepo, repoLabel } from "../_lib/github";
 export const list = query({
 	args: {},
 	handler: async (ctx) => {
-		const projects = await ctx.db
-			.query("projects")
-			.withIndex("by_order")
-			.take(100);
+		const projects = await ctx.db.query("projects").withIndex("by_order").take(100);
 		return projects.map((p) => ({
 			_id: p._id,
 			slug: p.slug,

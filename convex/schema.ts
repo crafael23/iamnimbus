@@ -11,11 +11,7 @@ export const vKnowledgeSource = v.union(
 	v.literal("github"),
 );
 
-export const vIngestStatus = v.union(
-	v.literal("pending"),
-	v.literal("ready"),
-	v.literal("error"),
-);
+export const vIngestStatus = v.union(v.literal("pending"), v.literal("ready"), v.literal("error"));
 
 export default defineSchema({
 	analyticsEvents: defineTable(eventFields).index("by_day_kind", ["day", "kind"]),

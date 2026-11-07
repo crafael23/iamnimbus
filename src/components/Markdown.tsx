@@ -44,14 +44,8 @@ export function Markdown({
 	cursor?: "typing" | "settled";
 }) {
 	return (
-		<div
-			className={variant === "terminal" ? "term-md" : "prose-grid"}
-			data-cursor={cursor}
-		>
-			<ReactMarkdown
-				remarkPlugins={[remarkGfm]}
-				components={variant === "terminal" ? terminalComponents : components}
-			>
+		<div className={variant === "terminal" ? "term-md" : "prose-grid"} data-cursor={cursor}>
+			<ReactMarkdown remarkPlugins={[remarkGfm]} components={variant === "terminal" ? terminalComponents : components}>
 				{children}
 			</ReactMarkdown>
 		</div>

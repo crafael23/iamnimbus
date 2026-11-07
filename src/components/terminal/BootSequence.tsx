@@ -95,9 +95,7 @@ export function BootSequence({
 				})}
 			</dl>
 			{shown >= lines.length + 3 && (
-				<p
-					className={`${animate ? "line-in" : ""} mt-8 text-[19px] text-cyan-dim sm:text-[21px]`}
-				>
+				<p className={`${animate ? "line-in" : ""} mt-8 text-[19px] text-cyan-dim sm:text-[21px]`}>
 					someone left this terminal running.
 				</p>
 			)}
@@ -105,15 +103,10 @@ export function BootSequence({
 				<p
 					className={`${animate ? "line-in" : ""} mt-1 max-w-[46rem] text-[19px] leading-snug text-fog sm:text-[21px]`}
 				>
-					Ask about projects, writing or work. Type{" "}
-					<span className="glow-text">/</span> for commands.
+					Ask about projects, writing or work. Type <span className="glow-text">/</span> for commands.
 				</p>
 			)}
-			{running && (
-				<p className="mt-10 text-[15px] uppercase tracking-[0.16em] text-dim">
-					press any key to skip
-				</p>
-			)}
+			{running && <p className="mt-10 text-[15px] uppercase tracking-[0.16em] text-dim">press any key to skip</p>}
 		</section>
 	);
 }

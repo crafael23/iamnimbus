@@ -97,11 +97,7 @@ export async function reserveTurn(ctx: MutationCtx, tier: Tier, now = Date.now()
  * End a turn's hold. With `charge`, the held amount is recorded as spent
  * instead (used when a real charge could not be recorded, to stay safe).
  */
-export async function releaseReservation(
-	ctx: MutationCtx,
-	reservationId: Id<"aiReservations">,
-	charge: boolean,
-) {
+export async function releaseReservation(ctx: MutationCtx, reservationId: Id<"aiReservations">, charge: boolean) {
 	const row = await ctx.db.get("aiReservations", reservationId);
 	if (!row) return;
 	if (charge) await recordSpend(ctx, row.amountUsd);
@@ -149,7 +145,5 @@ export function costOf(
 	const raw = usage?.raw as { cost?: unknown } | undefined;
 	if (typeof raw?.cost === "number") return raw.cost;
 	const price = FALLBACK_PRICES[model] ?? UNKNOWN_MODEL_PRICE;
-	return (
-		((usage?.inputTokens ?? 0) * price.input + (usage?.outputTokens ?? 0) * price.output) / 1_000_000
-	);
+	return ((usage?.inputTokens ?? 0) * price.input + (usage?.outputTokens ?? 0) * price.output) / 1_000_000;
 }

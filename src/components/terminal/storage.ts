@@ -20,8 +20,7 @@ function write(store: Storage | undefined, key: string, value: string) {
 	}
 }
 
-const session = () =>
-	typeof window === "undefined" ? undefined : window.sessionStorage;
+const session = () => (typeof window === "undefined" ? undefined : window.sessionStorage);
 
 export const hasBooted = () => read(session(), BOOT_KEY) === "1";
 export const markBooted = () => write(session(), BOOT_KEY, "1");
@@ -29,7 +28,5 @@ export const markBooted = () => write(session(), BOOT_KEY, "1");
 export const savedGuestThread = () => read(session(), THREAD_KEY) ?? undefined;
 export const saveGuestThread = (id: string) => write(session(), THREAD_KEY, id);
 
-export const clearedAt = (threadId: string) =>
-	Number(read(session(), CLEAR_KEY + threadId) ?? 0) || 0;
-export const saveClearedAt = (threadId: string, count: number) =>
-	write(session(), CLEAR_KEY + threadId, String(count));
+export const clearedAt = (threadId: string) => Number(read(session(), CLEAR_KEY + threadId) ?? 0) || 0;
+export const saveClearedAt = (threadId: string, count: number) => write(session(), CLEAR_KEY + threadId, String(count));

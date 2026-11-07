@@ -19,13 +19,9 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 	const pathname = usePathname();
 	const { user, signOut, loading } = useAuth();
 	const { isAuthenticated } = useConvexAuth();
-	const profile = useQuery(
-		api.users.queries.getMyProfileOrNull,
-		isAuthenticated ? {} : "skip",
-	);
+	const profile = useQuery(api.users.queries.getMyProfileOrNull, isAuthenticated ? {} : "skip");
 
-	const isActive = (href: string) =>
-		href === "/" ? pathname === "/" : pathname.startsWith(href);
+	const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
 	const linkClass = (href: string) =>
 		isActive(href)
@@ -79,10 +75,7 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 							sign out
 						</button>
 					) : (
-						<a
-							href={SIGN_IN_PATH}
-							className="whitespace-nowrap text-cyan transition-colors hover:text-ice"
-						>
+						<a href={SIGN_IN_PATH} className="whitespace-nowrap text-cyan transition-colors hover:text-ice">
 							sign in
 						</a>
 					)}

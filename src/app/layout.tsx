@@ -28,8 +28,7 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
 	title: { default: "nimbus // grid", template: "%s · nimbus" },
-	description:
-		"A portfolio you can talk to. Ask the terminal about projects, writing and work.",
+	description: "A portfolio you can talk to. Ask the terminal about projects, writing and work.",
 };
 
 export const viewport: Viewport = {
@@ -39,9 +38,7 @@ export const viewport: Viewport = {
 	viewportFit: "cover",
 };
 
-export default function RootLayout({
-	children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
 	return (
 		<html lang="en" className={`${display.variable} ${crt.variable} ${mono.variable}`}>
 			<body>

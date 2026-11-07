@@ -6,10 +6,7 @@ import { PLACEHOLDER_PERSONA } from "../_lib/persona";
 export const listVersions = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		const versions = await ctx.db
-			.query("systemPromptVersions")
-			.order("desc")
-			.take(200);
+		const versions = await ctx.db.query("systemPromptVersions").order("desc").take(200);
 		return versions.map((version, i) => ({
 			...version,
 			number: versions.length - i,
@@ -22,10 +19,7 @@ export const listVersions = adminQuery({
 export const activeContent = internalQuery({
 	args: {},
 	handler: async (ctx) => {
-		const latest = await ctx.db
-			.query("systemPromptVersions")
-			.order("desc")
-			.first();
+		const latest = await ctx.db.query("systemPromptVersions").order("desc").first();
 		return latest?.content ?? PLACEHOLDER_PERSONA;
 	},
 });

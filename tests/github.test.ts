@@ -75,22 +75,20 @@ describe("projects linked to GitHub repos", () => {
 		const t = setup();
 		const admin = await synced(t);
 		const first = await admin.mutation(api.projects.mutations.save, project("one", "owner/alpha"));
-		await expect(
-			admin.mutation(api.projects.mutations.save, project("two", "owner/alpha")),
-		).rejects.toThrow(/already linked to “Project one”/);
+		await expect(admin.mutation(api.projects.mutations.save, project("two", "owner/alpha"))).rejects.toThrow(
+			/already linked to “Project one”/,
+		);
 		// Re-saving the owner keeps its own link.
 		await admin.mutation(api.projects.mutations.save, { projectId: first, ...project("one", "owner/alpha") });
-		await expect(
-			admin.mutation(api.projects.mutations.save, project("two", "owner/beta")),
-		).resolves.toBeTruthy();
+		await expect(admin.mutation(api.projects.mutations.save, project("two", "owner/beta"))).resolves.toBeTruthy();
 	});
 
 	test("only repos in the last sync can be linked", async () => {
 		const t = setup();
 		const admin = await synced(t);
-		await expect(
-			admin.mutation(api.projects.mutations.save, project("x", "owner/missing")),
-		).rejects.toThrow(/not in the last GitHub sync/);
+		await expect(admin.mutation(api.projects.mutations.save, project("x", "owner/missing"))).rejects.toThrow(
+			/not in the last GitHub sync/,
+		);
 	});
 
 	test("a linked repo replaces a typed repository URL", async () => {
@@ -174,9 +172,9 @@ describe("projects linked to GitHub repos", () => {
 		});
 		await t.mutation(internal.github.mutations.applySync, { username: "owner", repos: [repo("alpha")] });
 
-		await expect(
-			admin.mutation(api.projects.mutations.save, project("new", "owner/alpha")),
-		).rejects.toThrow(/already linked to “Project old”/);
+		await expect(admin.mutation(api.projects.mutations.save, project("new", "owner/alpha"))).rejects.toThrow(
+			/already linked to “Project old”/,
+		);
 		expect((await docFor(t, "github", "owner/alpha"))?.content).toContain("Portfolio project: Project old");
 		const page = await t.query(api.projects.queries.getBySlug, { slug: "old" });
 		expect(page?.githubRepo).toBe("owner/alpha");
@@ -193,10 +191,7 @@ describe("projects linked to GitHub repos", () => {
 });
 
 describe("the GitHub sync", () => {
-	const gh = (
-		fullName: string,
-		extra: Partial<{ private: boolean; fork: boolean; pushed_at: string }> = {},
-	) => ({
+	const gh = (fullName: string, extra: Partial<{ private: boolean; fork: boolean; pushed_at: string }> = {}) => ({
 		name: fullName.split("/")[1],
 		full_name: fullName,
 		private: false,

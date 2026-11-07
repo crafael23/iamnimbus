@@ -5,13 +5,7 @@ import { mutation } from "../_generated/server";
 import { recordEvent } from "../_lib/analytics";
 import { reserveTurn } from "../_lib/billing";
 import { GUEST_NOTICE_AT, rateLimiter } from "../_lib/rateLimits";
-import {
-	authorizeThreadAccess,
-	latestThreadId,
-	limitFor,
-	remainingMessages,
-	resolveChatOwner,
-} from "./threads";
+import { authorizeThreadAccess, latestThreadId, limitFor, remainingMessages, resolveChatOwner } from "./threads";
 
 const MAX_PROMPT_LENGTH = 2000;
 /** How long an unanswered message blocks its thread (a crashed turn unblocks after this). */
@@ -79,10 +73,11 @@ export const sendMessage = mutation({
 		await authorizeThreadAccess(ctx, threadId, owner);
 		// One turn at a time per thread: a message that has not been judged yet
 		// must never be loaded as history by a concurrent turn.
-		const { page: latest } = await ctx.runQuery(
-			components.agent.messages.listMessagesByThreadId,
-			{ threadId, order: "desc", paginationOpts: { numItems: 1, cursor: null } },
-		);
+		const { page: latest } = await ctx.runQuery(components.agent.messages.listMessagesByThreadId, {
+			threadId,
+			order: "desc",
+			paginationOpts: { numItems: 1, cursor: null },
+		});
 		const last = latest[0];
 		if (last?.message?.role === "user") {
 			if (Date.now() - last._creationTime < TURN_LOCK_MS) {
@@ -99,8 +94,7 @@ export const sendMessage = mutation({
 		// Any later throw rolls the hold back with everything else.
 		const reservationId = await reserveTurn(ctx, owner.tier);
 
-		const limitName =
-			owner.tier === "guest" ? "guestMessages" : "registeredMessages";
+		const limitName = owner.tier === "guest" ? "guestMessages" : "registeredMessages";
 		const status = await rateLimiter.limit(ctx, limitName, {
 			key: owner.ownerId,
 		});

@@ -1,8 +1,4 @@
-import {
-	customAction,
-	customMutation,
-	customQuery,
-} from "convex-helpers/server/customFunctions";
+import { customAction, customMutation, customQuery } from "convex-helpers/server/customFunctions";
 import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import { action, mutation, query } from "../_generated/server";
@@ -55,10 +51,7 @@ export const adminMutation = customMutation(mutation, {
 export const adminAction = customAction(action, {
 	args: {},
 	input: async (ctx, args) => {
-		const user: Doc<"users"> = await ctx.runQuery(
-			internal.users.internal.requireAdminUser,
-			{},
-		);
+		const user: Doc<"users"> = await ctx.runQuery(internal.users.internal.requireAdminUser, {});
 		return { ctx: { ...ctx, user }, args };
 	},
 });

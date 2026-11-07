@@ -17,7 +17,7 @@ export const addUserToOrganization = internalAction({
 		const orgId = env.WORKOS_ORG_ID;
 		if (!orgId) {
 			console.warn(
-				"[auth] WORKOS_ORG_ID not set – skipping org assignment. Set it in Convex to auto-add users to your org."
+				"[auth] WORKOS_ORG_ID not set – skipping org assignment. Set it in Convex to auto-add users to your org.",
 			);
 			return;
 		}

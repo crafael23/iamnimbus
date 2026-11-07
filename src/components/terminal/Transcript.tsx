@@ -102,8 +102,8 @@ function SessionGate({ reason }: { reason: "session" | "network" }) {
 				{reason === "network"
 					? "Guest links from this network have used today’s transmissions."
 					: "That was the last of this session’s ten transmissions."}{" "}
-				Sign in to open a persistent channel: a deeper model, thirty messages a
-				day, and a conversation that is still here when you come back.
+				Sign in to open a persistent channel: a deeper model, thirty messages a day, and a conversation that is still
+				here when you come back.
 			</p>
 			<div className="mt-6 flex flex-wrap items-center gap-6 uppercase tracking-[0.1em]">
 				<a href={SIGN_IN_PATH} className="reverse-amber px-3 active:translate-y-px">

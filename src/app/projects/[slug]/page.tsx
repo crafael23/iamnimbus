@@ -15,9 +15,7 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { slug } = await params;
 	const project = await fetchQuery(api.projects.queries.getBySlug, { slug });
-	return project
-		? { title: project.title, description: project.summary }
-		: { title: "Not found" };
+	return project ? { title: project.title, description: project.summary } : { title: "Not found" };
 }
 
 const SECTIONS = [
@@ -36,7 +34,10 @@ export default async function ProjectPage({ params }: Props) {
 		<PageShell>
 			<article className="grid gap-12 lg:grid-cols-[minmax(0,68ch)_15rem] lg:justify-between">
 				<div>
-					<Link href="/projects" className="font-crt text-[18px] uppercase tracking-[0.1em] text-dim transition-colors hover:text-cyan">
+					<Link
+						href="/projects"
+						className="font-crt text-[18px] uppercase tracking-[0.1em] text-dim transition-colors hover:text-cyan"
+					>
 						{"< projects"}
 					</Link>
 					<h1 className="mt-8 scanned font-display text-[clamp(1.3rem,4.2vw,2.15rem)] leading-[1.2] text-ice">
@@ -105,7 +106,12 @@ function SyncedRepo({ repo }: { repo: NonNullable<Project["repo"]> }) {
 		<div>
 			<dt className="uppercase tracking-[0.1em] text-dim">github</dt>
 			<dd className="mt-1 space-y-1">
-				<a href={repo.url} target="_blank" rel="noreferrer noopener" className="block break-all text-cyan hover:text-ice">
+				<a
+					href={repo.url}
+					target="_blank"
+					rel="noreferrer noopener"
+					className="block break-all text-cyan hover:text-ice"
+				>
 					{repo.fullName} ↗
 				</a>
 				{repo.languages.length > 0 && (
