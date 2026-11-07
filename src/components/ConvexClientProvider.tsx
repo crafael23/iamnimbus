@@ -3,11 +3,13 @@
 import { ReactNode, useCallback, useState } from "react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithAuth } from "convex/react";
-import {
-	AuthKitProvider,
-	useAuth,
-	useAccessToken,
-} from "@workos-inc/authkit-nextjs/components";
+import { AuthKitProvider, useAuth, useAccessToken } from "@workos-inc/authkit-nextjs/components";
+
+/**
+ * Convex calls this hook itself, inside its provider. It is handed over on an
+ * object so the component never refers to a hook as a plain value.
+ */
+const authKit = { useAuth: useAuthFromAuthKit };
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
 	const [convex] = useState(() => {
@@ -15,10 +17,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
 	});
 	return (
 		<AuthKitProvider>
-			<ConvexProviderWithAuth
-				client={convex}
-				useAuth={useAuthFromAuthKit}
-			>
+			<ConvexProviderWithAuth client={convex} {...authKit}>
 				{children}
 			</ConvexProviderWithAuth>
 		</AuthKitProvider>
@@ -32,23 +31,20 @@ function useAuthFromAuthKit() {
 	const isAuthenticated = !!user;
 
 	const fetchAccessToken = useCallback(
-		async ({
-			forceRefreshToken,
-		}: { forceRefreshToken?: boolean } = {}): Promise<string | null> => {
+		async ({ forceRefreshToken }: { forceRefreshToken?: boolean } = {}): Promise<string | null> => {
 			if (!user) {
 				return null;
 			}
 
+			let token: string | null | undefined;
 			try {
-				if (forceRefreshToken) {
-					return (await refresh()) ?? null;
-				}
-
-				return (await getAccessToken()) ?? null;
+				if (forceRefreshToken) token = await refresh();
+				else token = await getAccessToken();
 			} catch (error) {
 				console.error("Failed to get access token:", error);
 				return null;
 			}
+			return token ?? null;
 		},
 		[user, refresh, getAccessToken],
 	);

@@ -1,55 +1,57 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "react",
-    "nextjs",
-    "jsx-a11y",
-    "import",
-    "unicorn",
-    "oxc"
-  ],
-  "options": {
-    "typeAware": true,
-    "reportUnusedDisableDirectives": "warn"
-  },
-  "categories": {
-    "correctness": "error"
-  },
-  "ignorePatterns": [
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-    "convex/_generated/**"
-  ],
-  "rules": {
-    "nextjs/no-html-link-for-pages": "error",
-    "nextjs/no-sync-scripts": "error",
-    "react/rules-of-hooks": "error",
-    "react/exhaustive-deps": "warn",
-    "react/static-components": "error",
-    "react/use-memo": "error",
-    "react/void-use-memo": "error",
-    "react/preserve-manual-memoization": "error",
-    "react/incompatible-library": "warn",
-    "react/immutability": "error",
-    "react/globals": "error",
-    "react/refs": "error",
-    "react/set-state-in-effect": "error",
-    "react/error-boundaries": "error",
-    "react/purity": "error",
-    "react/set-state-in-render": "error",
-    "react/unsupported-syntax": "warn",
-    "typescript/no-floating-promises": "error",
-    "typescript/no-misused-promises": "error",
-    "typescript/no-unused-vars": [
-      "warn",
-      {
-        "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_"
-      }
-    ]
-  }
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "react", "nextjs", "jsx-a11y", "import", "unicorn", "oxc"],
+	"jsPlugins": ["@convex-dev/eslint-plugin"],
+	"options": {
+		"typeAware": true,
+		"reportUnusedDisableDirectives": "warn"
+	},
+	"categories": {
+		"correctness": "error"
+	},
+	"ignorePatterns": [".next/**", "out/**", "build/**", "next-env.d.ts", "convex/_generated/**"],
+	"rules": {
+		"nextjs/no-html-link-for-pages": "error",
+		"nextjs/no-sync-scripts": "error",
+		"react/rules-of-hooks": "error",
+		"react/exhaustive-deps": "warn",
+		"react/static-components": "error",
+		"react/use-memo": "error",
+		"react/void-use-memo": "error",
+		"react/preserve-manual-memoization": "error",
+		"react/incompatible-library": "warn",
+		"react/immutability": "error",
+		"react/globals": "error",
+		"react/refs": "error",
+		"react/set-state-in-effect": "error",
+		"react/error-boundaries": "error",
+		"react/purity": "error",
+		"react/set-state-in-render": "error",
+		"react/unsupported-syntax": "warn",
+		"typescript/no-floating-promises": "error",
+		"typescript/no-misused-promises": "error",
+		"typescript/no-unused-vars": [
+			"warn",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern": "^_"
+			}
+		]
+	},
+	"overrides": [
+		{
+			"files": ["convex/**/*.ts"],
+			"rules": {
+				"@convex-dev/no-old-registered-function-syntax": "error",
+				"@convex-dev/require-args-validator": "error",
+				"@convex-dev/explicit-table-ids": "error",
+				"@convex-dev/no-filter-in-query": "warn",
+				"@convex-dev/no-top-of-hour-crons": "warn",
+				"@convex-dev/no-schema-import-cycle": "error",
+				"@convex-dev/no-duplicate-indexes": "error",
+				"@convex-dev/no-process-env": "error"
+			}
+		}
+	]
 }

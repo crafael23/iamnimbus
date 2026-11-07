@@ -1,3 +1,6 @@
+// Auth config is read when functions are pushed, not inside a function, so the
+// typed `env` from _generated/server is not available here.
+// oxlint-disable-next-line @convex-dev/no-process-env
 const clientId = process.env.WORKOS_CLIENT_ID;
 
 const authConfig = {

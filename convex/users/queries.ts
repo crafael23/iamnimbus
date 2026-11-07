@@ -1,8 +1,4 @@
-import {
-	adminQuery,
-	authedQuery,
-	optionalAuthQuery,
-} from "../_lib/customFunctions";
+import { adminQuery, authedQuery, optionalAuthQuery } from "../_lib/customFunctions";
 
 export const getMyProfile = authedQuery({
 	handler: async (ctx) => {

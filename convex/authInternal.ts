@@ -1,6 +1,6 @@
 "use node";
 
-import { internalAction } from "./_generated/server";
+import { env, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { authKit } from "./auth";
 
@@ -14,10 +14,10 @@ export const addUserToOrganization = internalAction({
 		workosUserId: v.string(),
 	},
 	handler: async (_ctx, args) => {
-		const orgId = process.env.WORKOS_ORG_ID;
+		const orgId = env.WORKOS_ORG_ID;
 		if (!orgId) {
 			console.warn(
-				"[auth] WORKOS_ORG_ID not set – skipping org assignment. Set it in Convex to auto-add users to your org."
+				"[auth] WORKOS_ORG_ID not set – skipping org assignment. Set it in Convex to auto-add users to your org.",
 			);
 			return;
 		}
