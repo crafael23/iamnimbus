@@ -445,7 +445,11 @@ function updateHaze(glass: Glass) {
 	glass.maskBusy = true;
 	void Promise.all([toUrl(dust), toUrl(clean)]).then(([dustUrl, cleanUrl]) => {
 		glass.maskBusy = false;
-		if (!dustUrl || !cleanUrl || glass.done) return;
+		if (!dustUrl || !cleanUrl || glass.done) {
+			// Clean, or gone, while these were encoding: nothing will use them.
+			for (const u of [dustUrl, cleanUrl]) if (u) URL.revokeObjectURL(u);
+			return;
+		}
 		setMask(haze, dustUrl);
 		setMask(sharp, cleanUrl);
 		const old = glass.maskUrls;
@@ -702,6 +706,8 @@ function useDustGlass({
 		const frame = raf.current;
 		return () => {
 			cancelAnimationFrame(frame.id);
+			// An encode still in flight sees this and drops its masks.
+			g.done = true;
 			for (const u of g.maskUrls) URL.revokeObjectURL(u);
 		};
 	}, []);
