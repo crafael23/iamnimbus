@@ -15,9 +15,10 @@ import {
  * long time: a dark tube under a film of dust, with only the clock still
  * running behind it. A hand sweeps across the glass; once enough is clean
  * the screen wakes and its windows light up under the remaining dust. The
- * rest is cleared, `whoami` is typed into the session window, the machine
- * answers `nimbus`, and that window opens out into the terminal where the
- * chat begins.
+ * hand keeps wiping, flat now, over whatever is still dusty until the whole
+ * glass is clean. Then `whoami` is typed into the session window, the
+ * machine answers `nimbus`, and that window opens out into the terminal
+ * where the chat begins.
  *
  * It plays by itself. Any key, or the skip button, goes straight to the
  * terminal.
@@ -45,6 +46,22 @@ type Bristle = { offset: number; width: number; seed: number };
  * narrows from the edges as it lands and lifts, which tapers its stroke.
  */
 type Finger = { offset: number; width: number; t0: number; t1: number; wave: number; bristles: Bristle[] };
+/** One pass of the hand across the glass, with the path it bows along. */
+type Pass = {
+	y: number;
+	dir: number;
+	hand: Finger[];
+	bow: number;
+	tilt: number;
+	from: number;
+	to: number;
+	/** Hand size, in hand widths. */
+	scale: number;
+	ms: number;
+	lift: number;
+	/** Fingertips leave a faint smear; the flat of the hand does not. */
+	smear: boolean;
+};
 type Glass = {
 	film: CanvasRenderingContext2D;
 	residue: CanvasRenderingContext2D | null;
@@ -70,11 +87,20 @@ type Glass = {
 const WAKE_AT = 0.12;
 /** How long the dusty clock sits before the hand arrives. */
 const DORMANT_MS = 1500;
-/** Each sweep of the hand, and the pause while it lifts for the next. */
+/** Each sweep of the fingers, and the pause while the hand lifts for the next. */
 const SWEEP_MS = 620;
 const LIFT_MS = 150;
-/** Where each sweep crosses the glass, top to bottom: through the clock first. */
-const SWEEPS = [0.52, 0.27, 0.8, 0.05];
+/** Where the fingers cross the glass: through the clock first. */
+const SWEEPS = [0.52, 0.27, 0.8];
+/** The flat of the hand is quicker: it is cleaning now, not discovering. */
+const PALM_MS = 420;
+const PALM_LIFT_MS = 70;
+/** The band the flat of the hand clears for sure, as a share of the screen's height (at least). */
+const PALM_BAND = 0.28;
+/** The glass is clean once no patch of it is dustier than this (alpha out of 255). */
+const CLEAN_CELL = 6;
+/** In case a speck in a corner escapes the hand, it stops after this many passes. */
+const MAX_PALMS = 9;
 const COMMAND = "whoami";
 const PROBE_W = 48;
 const PROBE_H = 27;
@@ -126,6 +152,30 @@ function makeHand(): Finger[] {
 			})),
 		};
 	});
+}
+
+/**
+ * The flat of the hand: fingers closed, one broad contact. Its lines are
+ * laid side by side with no gaps, so it clears a solid band with frayed edges.
+ */
+function makePalm(): Finger[] {
+	const r = Math.random;
+	const n = 40;
+	return [
+		{
+			offset: 0,
+			width: 1,
+			// Already pressing as it enters the screen, still pressing as it leaves.
+			t0: -0.1,
+			t1: 1.1,
+			wave: r() * Math.PI * 2,
+			bristles: Array.from({ length: n }, (_, i) => ({
+				offset: -1 + ((i + r()) / n) * 2,
+				width: 0.05 + r() * 0.04,
+				seed: r() * 1000,
+			})),
+		},
+	];
 }
 
 /** Smooth 1D noise in 0..1. */
@@ -294,15 +344,65 @@ function paintFilm(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: num
 	ctx.globalCompositeOperation = "source-over";
 }
 
-function dustLeft(glass: Glass) {
+/** The dust on the glass, averaged into a coarse grid (RGBA; alpha is the dust). */
+function probeDust(glass: Glass) {
 	const p = glass.probe;
-	if (!p) return 0;
+	if (!p) return null;
 	p.clearRect(0, 0, PROBE_W, PROBE_H);
 	p.drawImage(glass.film.canvas, 0, 0, PROBE_W, PROBE_H);
-	const data = p.getImageData(0, 0, PROBE_W, PROBE_H).data;
+	return p.getImageData(0, 0, PROBE_W, PROBE_H).data;
+}
+
+function dustLeft(glass: Glass) {
+	const data = probeDust(glass);
+	if (!data) return 0;
 	let sum = 0;
 	for (let k = 3; k < data.length; k += 4) sum += data[k];
 	return sum;
+}
+
+/** Where a pass is at a point across the screen (0..1), as a share of its height. */
+const pathY = (p: Pick<Pass, "y" | "bow" | "tilt">, along: number) =>
+	p.y - p.bow * Math.sin(Math.PI * along) + p.tilt * (along - 0.5);
+
+/**
+ * The next pass of the flat hand: through the dustiest band left, or none
+ * once the glass is clean.
+ */
+function nextPalm(glass: Glass, dir: number): Pass | null {
+	const d = probeDust(glass);
+	if (!d) return null;
+	let worst = 0;
+	for (let k = 3; k < d.length; k += 4) if (d[k] > worst) worst = d[k];
+	if (worst < CLEAN_CELL) return null;
+	const r = Math.random;
+	// The hand's solid core is about 70% of its width; aim with that.
+	const scale = Math.max(1.5, (PALM_BAND * glass.height) / (0.7 * glass.hand));
+	const half = (0.33 * glass.hand * scale) / glass.height;
+	const shape = {
+		dir,
+		bow: 0.03 + r() * 0.05,
+		tilt: (r() - 0.5) * 0.08,
+		// Far enough past both edges that the trailing edges of the hand clear the corners too.
+		from: -0.2 + r() * 0.04,
+		to: 1.16 + r() * 0.04,
+	};
+	const bands: { y: number; score: number }[] = [];
+	for (let y = -0.04; y <= 1.04; y += 0.02) {
+		let score = 0;
+		for (let cx = 0; cx < PROBE_W; cx++) {
+			const py = pathY({ ...shape, y }, ((cx + 0.5) / PROBE_W - shape.from) / (shape.to - shape.from));
+			for (let cy = 0; cy < PROBE_H; cy++) {
+				if (Math.abs((cy + 0.5) / PROBE_H - py) < half) score += d[(cy * PROBE_W + cx) * 4 + 3];
+			}
+		}
+		bands.push({ y, score });
+	}
+	// Work down the glass the way a person would, top to bottom, skipping
+	// bands that are already clean, rather than jumping to the worst one.
+	const best = Math.max(...bands.map((b) => b.score));
+	const y = bands.find((b) => b.score >= best * 0.5)?.y ?? 0.5;
+	return { ...shape, y, hand: makePalm(), scale, ms: PALM_MS, lift: PALM_LIFT_MS, smear: false };
 }
 
 const toUrl = (canvas: HTMLCanvasElement) =>
@@ -413,7 +513,7 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 	 * it fully: the strokes are near black. A few leave a faint smear.
 	 */
 	const wipe = useCallback(
-		(a: Pt, b: Pt, u0: number, u1: number, fingers: Finger[], scale: number, from: Pt | null) => {
+		(a: Pt, b: Pt, u0: number, u1: number, fingers: Finger[], scale: number, from: Pt | null, smears: boolean) => {
 			const g = glass.current;
 			if (!g) return null;
 			const dx = b.x - a.x;
@@ -442,7 +542,7 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 				if (u1 < f.t0 || u0 > f.t1) continue;
 				const fw = f.width * hand;
 				for (const s of f.bristles) {
-					const smear = residue && s.seed % 6 < 1;
+					const smear = smears && residue && s.seed % 6 < 1;
 					let run = 0;
 					const flush = () => {
 						if (!run) return;
@@ -497,7 +597,11 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 		[measure],
 	);
 
-	/** Broad arcing sweeps across the glass, like a forearm clearing a desk. */
+	/**
+	 * Broad arcing sweeps of the fingers across the glass, like a forearm
+	 * clearing a desk, then passes of the flat hand over whatever dust is
+	 * left, back and forth, until the glass is clean.
+	 */
 	const sweep = useCallback(() => {
 		const g = glass.current;
 		if (!g) {
@@ -505,7 +609,7 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 			return;
 		}
 		// No two sweeps alike: each arcs, tilts and reaches a little differently.
-		const arcs = SWEEPS.map((y, i) => ({
+		const passes: Pass[] = SWEEPS.map((y, i) => ({
 			y,
 			dir: i % 2 ? -1 : 1,
 			hand: makeHand(),
@@ -513,40 +617,48 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 			tilt: (Math.random() - 0.5) * 0.12,
 			from: -0.14 + Math.random() * 0.12,
 			to: 1.02 + Math.random() * 0.12,
+			scale: 1.5,
+			ms: SWEEP_MS,
+			lift: LIFT_MS,
+			smear: true,
 		}));
-		const start = performance.now();
-		const per = SWEEP_MS + LIFT_MS;
-		let arc = -1;
+		let i = 0;
+		let start = performance.now();
+		let palms = 0;
 		let heading: Pt | null = null;
-		let last = { p: { x: 0, y: 0 }, u: 0 };
+		let last: { p: Pt; u: number } | null = null;
 		const frame = (t: number) => {
 			// A frame's timestamp can precede the call that scheduled it.
-			const k = Math.max(0, t - start) / per;
-			const i = Math.floor(k);
-			const a = arcs[i];
-			if (!a) {
-				setStage((s) => (reached(s, "clean") ? s : "clean"));
-				return;
-			}
-			const f = Math.min(1, ((k - i) * per) / SWEEP_MS);
-			// Ease in and out, as an arm would.
-			const u = smooth(f);
-			const along = a.dir > 0 ? u : 1 - u;
-			const p = {
-				x: (a.from + (a.to - a.from) * along) * g.width,
-				y: (a.y - a.bow * Math.sin(Math.PI * along) + a.tilt * (along - 0.5)) * g.height,
-			};
-			if (i !== arc) {
-				arc = i;
+			let elapsed = Math.max(0, t - start);
+			if (elapsed >= passes[i].ms + passes[i].lift) {
+				const prev = passes[i];
+				const next = passes[i + 1] ?? (palms < MAX_PALMS ? nextPalm(g, -prev.dir) : null);
+				if (!next) {
+					measure();
+					setStage((s) => (reached(s, "clean") ? s : "clean"));
+					return;
+				}
+				if (!passes[i + 1]) {
+					palms++;
+					passes.push(next);
+				}
+				i++;
+				start = t;
+				elapsed = 0;
 				heading = null;
-			} else if (last.u < 1) {
-				heading = wipe(last.p, p, last.u, u, a.hand, 1.5, heading);
+				last = null;
 			}
+			const a = passes[i];
+			// Ease in and out, as an arm would.
+			const u = smooth(Math.min(1, elapsed / a.ms));
+			const along = a.dir > 0 ? u : 1 - u;
+			const p = { x: (a.from + (a.to - a.from) * along) * g.width, y: pathY(a, along) * g.height };
+			if (last && last.u < 1) heading = wipe(last.p, p, last.u, u, a.hand, a.scale, heading, a.smear);
 			last = { p, u };
 			raf.current = requestAnimationFrame(frame);
 		};
 		raf.current = requestAnimationFrame(frame);
-	}, [wipe]);
+	}, [wipe, measure]);
 
 	// Lay the dust before the first paint.
 	useLayoutEffect(() => {
