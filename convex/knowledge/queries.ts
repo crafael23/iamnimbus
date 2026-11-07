@@ -22,12 +22,12 @@ export const list = adminQuery({
 
 export const get = adminQuery({
 	args: { docId: v.id("knowledgeDocs") },
-	handler: async (ctx, { docId }) => await ctx.db.get(docId),
+	handler: async (ctx, { docId }) => await ctx.db.get("knowledgeDocs", docId),
 });
 
 export const getForIngest = internalQuery({
 	args: { docId: v.id("knowledgeDocs") },
-	handler: async (ctx, { docId }) => await ctx.db.get(docId),
+	handler: async (ctx, { docId }) => await ctx.db.get("knowledgeDocs", docId),
 });
 
 /** Index status of the doc mirroring a blog post or project, for the editors. */
@@ -60,7 +60,7 @@ export const existingDocIds = internalQuery({
 		const docs = await Promise.all(
 			keys.map((key) => {
 				const id = ctx.db.normalizeId("knowledgeDocs", key);
-				return id ? ctx.db.get(id) : Promise.resolve(null);
+				return id ? ctx.db.get("knowledgeDocs", id) : Promise.resolve(null);
 			}),
 		);
 		const live: { key: string; asOf?: AsOf }[] = [];

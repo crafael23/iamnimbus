@@ -1,3 +1,4 @@
+import { env } from "../_generated/server";
 import { adminQuery } from "../_lib/customFunctions";
 import { repoKey, repoLabel } from "../_lib/github";
 
@@ -7,12 +8,12 @@ export const lastRun = adminQuery({
 		const run = await ctx.db.query("githubSyncRuns").order("desc").first();
 		return {
 			run,
-			username: process.env.GITHUB_USERNAME ?? null,
-			orgs: (process.env.GITHUB_ORGS ?? "")
+			username: env.GITHUB_USERNAME ?? null,
+			orgs: (env.GITHUB_ORGS ?? "")
 				.split(",")
 				.map((o) => o.trim())
 				.filter(Boolean),
-			hasToken: Boolean(process.env.GITHUB_TOKEN),
+			hasToken: Boolean(env.GITHUB_TOKEN),
 		};
 	},
 });

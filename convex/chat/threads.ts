@@ -2,7 +2,7 @@ import { getThreadMetadata } from "@convex-dev/agent";
 import { calculateRateLimit } from "@convex-dev/rate-limiter";
 import { ConvexError } from "convex/values";
 import { components } from "../_generated/api";
-import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { readGuestAccess } from "../_lib/guestToken";
 import type { Tier } from "../_lib/persona";
 import {
@@ -36,7 +36,7 @@ export async function resolveChatOwner(
 	if (identity) {
 		return { tier: "registered", ownerId: `user:${identity.subject}` };
 	}
-	const secret = process.env.GUEST_TOKEN_SECRET;
+	const secret = env.GUEST_TOKEN_SECRET;
 	if (!secret) throw new Error("GUEST_TOKEN_SECRET is not set on this deployment");
 	const access = guestToken ? await readGuestAccess(secret, guestToken) : null;
 	// Writes need a current token so the network is current; reads may use

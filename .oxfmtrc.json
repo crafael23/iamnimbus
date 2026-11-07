@@ -1,0 +1,16 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"printWidth": 120,
+	"ignorePatterns": [
+		"convex/_generated/**",
+		"experience-data/**",
+		".agents/**",
+		".claude/**",
+		".cursor/**",
+		"**/*.md",
+		"pnpm-lock.yaml",
+		"skills-lock.json",
+		"next-env.d.ts"
+	]
+}

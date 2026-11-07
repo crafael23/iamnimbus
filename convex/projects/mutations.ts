@@ -97,10 +97,10 @@ export const save = adminMutation({
 		let id = projectId;
 		let previousRepo: string | undefined;
 		if (id) {
-			const existing = await ctx.db.get(id);
+			const existing = await ctx.db.get("projects", id);
 			if (!existing) throw new ConvexError("Project not found");
 			previousRepo = existing.githubRepo;
-			await ctx.db.patch(id, { ...clean, updatedAt: Date.now() });
+			await ctx.db.patch("projects", id, { ...clean, updatedAt: Date.now() });
 		} else {
 			id = await ctx.db.insert("projects", { ...clean, updatedAt: Date.now() });
 		}
@@ -124,9 +124,9 @@ export const save = adminMutation({
 export const remove = adminMutation({
 	args: { projectId: v.id("projects") },
 	handler: async (ctx, { projectId }) => {
-		const project = await ctx.db.get(projectId);
+		const project = await ctx.db.get("projects", projectId);
 		if (!project) return;
-		await ctx.db.delete(projectId);
+		await ctx.db.delete("projects", projectId);
 		await removeDerivedDoc(ctx, "project", projectId);
 		if (project.githubRepo) await refreshRepoDoc(ctx, project.githubRepo);
 	},

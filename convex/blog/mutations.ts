@@ -67,11 +67,11 @@ export const create = adminMutation({
 export const update = adminMutation({
 	args: { postId: v.id("blogPosts"), ...vPostFields },
 	handler: async (ctx, { postId, ...fields }) => {
-		const post = await ctx.db.get(postId);
+		const post = await ctx.db.get("blogPosts", postId);
 		if (!post) throw new ConvexError("Post not found");
 		if (!fields.title.trim()) throw new ConvexError("Title is required");
 		await assertSlugFree(ctx, fields.slug, postId);
-		await ctx.db.patch(postId, { ...fields, updatedAt: Date.now() });
+		await ctx.db.patch("blogPosts", postId, { ...fields, updatedAt: Date.now() });
 		await syncIndex(ctx, { ...post, ...fields });
 	},
 });
@@ -79,10 +79,10 @@ export const update = adminMutation({
 export const publish = adminMutation({
 	args: { postId: v.id("blogPosts") },
 	handler: async (ctx, { postId }) => {
-		const post = await ctx.db.get(postId);
+		const post = await ctx.db.get("blogPosts", postId);
 		if (!post) throw new ConvexError("Post not found");
 		const publishedAt = post.publishedAt ?? Date.now();
-		await ctx.db.patch(postId, {
+		await ctx.db.patch("blogPosts", postId, {
 			status: "published",
 			publishedAt,
 			updatedAt: Date.now(),
@@ -94,9 +94,9 @@ export const publish = adminMutation({
 export const unpublish = adminMutation({
 	args: { postId: v.id("blogPosts") },
 	handler: async (ctx, { postId }) => {
-		const post = await ctx.db.get(postId);
+		const post = await ctx.db.get("blogPosts", postId);
 		if (!post) throw new ConvexError("Post not found");
-		await ctx.db.patch(postId, { status: "draft", updatedAt: Date.now() });
+		await ctx.db.patch("blogPosts", postId, { status: "draft", updatedAt: Date.now() });
 		await syncIndex(ctx, { ...post, status: "draft" });
 	},
 });
@@ -104,9 +104,9 @@ export const unpublish = adminMutation({
 export const remove = adminMutation({
 	args: { postId: v.id("blogPosts") },
 	handler: async (ctx, { postId }) => {
-		const post = await ctx.db.get(postId);
+		const post = await ctx.db.get("blogPosts", postId);
 		if (!post) return;
-		await ctx.db.delete(postId);
+		await ctx.db.delete("blogPosts", postId);
 		await removeDerivedDoc(ctx, "blog", postId);
 	},
 });

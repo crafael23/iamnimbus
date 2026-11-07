@@ -43,7 +43,7 @@ export const adminList = adminQuery({
 
 export const adminGet = adminQuery({
 	args: { postId: v.id("blogPosts") },
-	handler: async (ctx, { postId }) => await ctx.db.get(postId),
+	handler: async (ctx, { postId }) => await ctx.db.get("blogPosts", postId),
 });
 
 function readingMinutes(content: string) {

@@ -1,7 +1,7 @@
 import { AuthKit, type AuthFunctions } from "@convex-dev/workos-authkit";
 import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import { env, type MutationCtx } from "./_generated/server";
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -53,7 +53,7 @@ export const { authKitEvent } = authKit.events({
       event.data.email?.split("@")[0] ||
       user.name;
 
-    await ctx.db.patch(user._id, {
+    await ctx.db.patch("users", user._id, {
       email: event.data.email ?? user.email,
       name,
       pictureUrl: event.data.profilePictureUrl ?? user.pictureUrl,
@@ -67,7 +67,7 @@ export const { authKitEvent } = authKit.events({
 			.unique();
 
 		if (user) {
-			await ctx.db.delete(user._id);
+			await ctx.db.delete("users", user._id);
 		}
 	},
 	// Roles follow the site's WorkOS organization membership. A deleted or
@@ -113,7 +113,7 @@ async function syncMembershipRole(ctx: MutationCtx, data: unknown, deleted: bool
 	const userId = m.userId ?? m.user_id;
 	if (!userId) return;
 	const orgId = m.organizationId ?? m.organization_id;
-	const siteOrg = process.env.WORKOS_ORG_ID;
+	const siteOrg = env.WORKOS_ORG_ID;
 	if (siteOrg && orgId && orgId !== siteOrg) return;
 
 	const user = await ctx.db
@@ -139,7 +139,7 @@ async function syncMembershipRole(ctx: MutationCtx, data: unknown, deleted: bool
 	}
 
 	const active = !deleted && (m.status === undefined || m.status === "active");
-	await ctx.db.patch(user._id, {
+	await ctx.db.patch("users", user._id, {
 		role: active ? (m.role?.slug ?? m.roles?.[0]?.slug) : undefined,
 		membershipId: membershipId ?? user.membershipId,
 		membershipUpdatedAt: updatedAt ?? user.membershipUpdatedAt,

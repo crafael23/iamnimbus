@@ -52,7 +52,7 @@ export async function updateKnowledgeDoc(
 	fields: { title: string; content: string },
 ) {
 	const version = doc.version + 1;
-	await ctx.db.patch(doc._id, {
+	await ctx.db.patch("knowledgeDocs", doc._id, {
 		...fields,
 		status: "pending",
 		error: undefined,
@@ -76,7 +76,7 @@ export async function deleteKnowledgeDoc(
 	ctx: MutationCtx,
 	doc: Doc<"knowledgeDocs">,
 ) {
-	await ctx.db.delete(doc._id);
+	await ctx.db.delete("knowledgeDocs", doc._id);
 	await ctx.scheduler.runAfter(0, internal.knowledge.actions.removeFromIndex, {
 		namespace: doc.namespace,
 		key: doc._id,
@@ -128,7 +128,7 @@ export async function upsertDerivedDoc(
 	}
 	// The date only affects ranking, so changing it needs no re-embedding.
 	if (existing.asOf !== fields.asOf) {
-		await ctx.db.patch(existing._id, { asOf: fields.asOf });
+		await ctx.db.patch("knowledgeDocs", existing._id, { asOf: fields.asOf });
 	}
 	const unchanged =
 		existing.title === fields.title &&

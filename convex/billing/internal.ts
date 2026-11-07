@@ -42,12 +42,12 @@ export const claim = internalMutation({
 	returns: v.union(v.id("aiReservations"), v.null()),
 	handler: async (ctx, { reservationId, tier }) => {
 		const now = Date.now();
-		const hold = await ctx.db.get(reservationId);
+		const hold = await ctx.db.get("aiReservations", reservationId);
 		if (hold && hold.createdAt > now - RESERVATION_TTL_MS) {
-			await ctx.db.patch(reservationId, { createdAt: now });
+			await ctx.db.patch("aiReservations", reservationId, { createdAt: now });
 			return reservationId;
 		}
-		if (hold) await ctx.db.delete(reservationId);
+		if (hold) await ctx.db.delete("aiReservations", reservationId);
 		try {
 			return await reserveTurn(ctx, tier, now);
 		} catch (error) {

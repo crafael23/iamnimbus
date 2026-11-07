@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import type { Tier } from "./persona";
 
 /**
@@ -17,8 +17,8 @@ import type { Tier } from "./persona";
 const DEFAULT_MONTHLY_BUDGET_USD = 18;
 const DEFAULT_DAILY_BUDGET_USD = 3;
 
-function envNumber(name: string, fallback: number) {
-	const value = Number(process.env[name]);
+function envNumber(name: "AI_MONTHLY_BUDGET_USD" | "AI_DAILY_BUDGET_USD", fallback: number) {
+	const value = Number(env[name]);
 	return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
@@ -89,7 +89,7 @@ export async function reserveTurn(ctx: MutationCtx, tier: Tier, now = Date.now()
 		.query("aiReservations")
 		.withIndex("by_createdAt", (q) => q.lte("createdAt", now - RESERVATION_TTL_MS))
 		.take(10);
-	await Promise.all(expired.map((row) => ctx.db.delete(row._id)));
+	await Promise.all(expired.map((row) => ctx.db.delete("aiReservations", row._id)));
 	return await ctx.db.insert("aiReservations", { amountUsd, createdAt: now });
 }
 
@@ -102,10 +102,10 @@ export async function releaseReservation(
 	reservationId: Id<"aiReservations">,
 	charge: boolean,
 ) {
-	const row = await ctx.db.get(reservationId);
+	const row = await ctx.db.get("aiReservations", reservationId);
 	if (!row) return;
 	if (charge) await recordSpend(ctx, row.amountUsd);
-	await ctx.db.delete(reservationId);
+	await ctx.db.delete("aiReservations", reservationId);
 }
 
 export async function recordSpend(ctx: MutationCtx, costUsd: number, now = Date.now()) {
@@ -120,7 +120,7 @@ export async function recordSpend(ctx: MutationCtx, costUsd: number, now = Date.
 				.withIndex("by_period_shard", (q) => q.eq("period", period).eq("shard", shard))
 				.unique();
 			if (row) {
-				await ctx.db.patch(row._id, { costUsd: row.costUsd + costUsd, calls: row.calls + 1 });
+				await ctx.db.patch("aiSpend", row._id, { costUsd: row.costUsd + costUsd, calls: row.calls + 1 });
 			} else {
 				await ctx.db.insert("aiSpend", { period, shard, costUsd, calls: 1 });
 			}

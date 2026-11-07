@@ -47,13 +47,13 @@ export const update = adminMutation({
 	},
 	handler: async (ctx, { docId, title, content, asOf }) => {
 		validate(title, content, asOf);
-		const doc = await ctx.db.get(docId);
+		const doc = await ctx.db.get("knowledgeDocs", docId);
 		if (!doc) throw new ConvexError("Document not found");
 		if (doc.source !== "manual") {
 			throw new ConvexError(`Edit this document from its ${doc.source} source`);
 		}
 		// The date only affects ranking: changing it alone needs no re-embedding.
-		if (doc.asOf !== asOf) await ctx.db.patch(docId, { asOf });
+		if (doc.asOf !== asOf) await ctx.db.patch("knowledgeDocs", docId, { asOf });
 		if (doc.title !== title || doc.content !== content) {
 			await updateKnowledgeDoc(ctx, doc, { title, content });
 		}
@@ -63,7 +63,7 @@ export const update = adminMutation({
 export const remove = adminMutation({
 	args: { docId: v.id("knowledgeDocs") },
 	handler: async (ctx, { docId }) => {
-		const doc = await ctx.db.get(docId);
+		const doc = await ctx.db.get("knowledgeDocs", docId);
 		if (!doc) return;
 		if (doc.source !== "manual") {
 			throw new ConvexError(`Remove this document from its ${doc.source} source`);
@@ -75,7 +75,7 @@ export const remove = adminMutation({
 export const reingest = adminMutation({
 	args: { docId: v.id("knowledgeDocs") },
 	handler: async (ctx, { docId }) => {
-		const doc = await ctx.db.get(docId);
+		const doc = await ctx.db.get("knowledgeDocs", docId);
 		if (!doc) throw new ConvexError("Document not found");
 		await reingestKnowledgeDoc(ctx, doc);
 	},
@@ -90,7 +90,7 @@ export const markIngested = internalMutation({
 		screenedVersion: v.optional(v.number()),
 	},
 	handler: async (ctx, { docId, version, namespace, chunkCount, screenedVersion }) => {
-		const doc = await ctx.db.get(docId);
+		const doc = await ctx.db.get("knowledgeDocs", docId);
 		if (!doc) {
 			// Deleted while ingesting: drop the vectors this run just wrote.
 			await ctx.scheduler.runAfter(0, internal.knowledge.actions.removeFromIndex, {
@@ -108,7 +108,7 @@ export const markIngested = internalMutation({
 			});
 			return;
 		}
-		await ctx.db.patch(docId, {
+		await ctx.db.patch("knowledgeDocs", docId, {
 			status: "ready",
 			error: undefined,
 			screenedVersion,
@@ -121,8 +121,8 @@ export const markIngested = internalMutation({
 export const markFailed = internalMutation({
 	args: { docId: v.id("knowledgeDocs"), version: v.number(), error: v.string() },
 	handler: async (ctx, { docId, version, error }) => {
-		const doc = await ctx.db.get(docId);
+		const doc = await ctx.db.get("knowledgeDocs", docId);
 		if (!doc || doc.version !== version) return;
-		await ctx.db.patch(docId, { status: "error", error: error.slice(0, 500) });
+		await ctx.db.patch("knowledgeDocs", docId, { status: "error", error: error.slice(0, 500) });
 	},
 });

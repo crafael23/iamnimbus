@@ -49,5 +49,5 @@ export const getBySlug = query({
 
 export const adminGet = adminQuery({
 	args: { projectId: v.id("projects") },
-	handler: async (ctx, { projectId }) => await ctx.db.get(projectId),
+	handler: async (ctx, { projectId }) => await ctx.db.get("projects", projectId),
 });

@@ -23,7 +23,7 @@ export const save = adminMutation({
 export const restore = adminMutation({
 	args: { versionId: v.id("systemPromptVersions") },
 	handler: async (ctx, { versionId }) => {
-		const version = await ctx.db.get(versionId);
+		const version = await ctx.db.get("systemPromptVersions", versionId);
 		if (!version) throw new ConvexError("Version not found");
 		return await ctx.db.insert("systemPromptVersions", {
 			content: version.content,

@@ -1,5 +1,6 @@
 import { ConvexError } from "convex/values";
 import { internal } from "../_generated/api";
+import { env } from "../_generated/server";
 import { adminAction } from "../_lib/customFunctions";
 
 const API = "https://api.github.com";
@@ -32,8 +33,8 @@ function headers(accept = "application/vnd.github+json") {
 		"User-Agent": "portfolio-os-sync",
 		"X-GitHub-Api-Version": "2022-11-28",
 	};
-	if (process.env.GITHUB_TOKEN) {
-		h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+	if (env.GITHUB_TOKEN) {
+		h.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
 	}
 	return h;
 }
@@ -114,7 +115,7 @@ const isPublicSource = (r: GithubRepo) => !r.private && !r.fork;
 
 /** Organizations to scan: GITHUB_ORGS plus any public memberships. */
 async function organizations(username: string) {
-	const configured = (process.env.GITHUB_ORGS ?? "")
+	const configured = (env.GITHUB_ORGS ?? "")
 		.split(",")
 		.map((o) => o.trim())
 		.filter(Boolean);
@@ -137,7 +138,7 @@ async function organizations(username: string) {
 export const sync = adminAction({
 	args: {},
 	handler: async (ctx): Promise<{ synced: number; removed: number; orgs: string[] }> => {
-		const username = process.env.GITHUB_USERNAME;
+		const username = env.GITHUB_USERNAME;
 		if (!username) throw new ConvexError("GITHUB_USERNAME is not set");
 		try {
 			const own = (

@@ -120,7 +120,7 @@ export const clear = internalMutation({
 		const removed: string[] = [];
 		for (const p of await ctx.db.query("projects").collect()) {
 			if (p.slug.startsWith("sample-")) {
-				await ctx.db.delete(p._id);
+				await ctx.db.delete("projects", p._id);
 				await removeDerivedDoc(ctx, "project", p._id);
 				if (p.githubRepo) await refreshRepoDoc(ctx, p.githubRepo);
 				removed.push(p.slug);
@@ -128,7 +128,7 @@ export const clear = internalMutation({
 		}
 		for (const p of await ctx.db.query("blogPosts").collect()) {
 			if (p.slug.startsWith("sample-")) {
-				await ctx.db.delete(p._id);
+				await ctx.db.delete("blogPosts", p._id);
 				await removeDerivedDoc(ctx, "blog", p._id);
 				removed.push(p.slug);
 			}

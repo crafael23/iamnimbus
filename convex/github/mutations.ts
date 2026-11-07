@@ -18,7 +18,7 @@ export const applySync = internalMutation({
 		await Promise.all(
 			projects.flatMap((project) =>
 				project.githubRepo && project.githubRepo !== repoKey(project.githubRepo)
-					? [ctx.db.patch(project._id, { githubRepo: repoKey(project.githubRepo) })]
+					? [ctx.db.patch("projects", project._id, { githubRepo: repoKey(project.githubRepo) })]
 					: [],
 			),
 		);
@@ -35,7 +35,7 @@ export const applySync = internalMutation({
 			[...byKey.values()].map(async (repo) => {
 				const existing = await findRepo(ctx, repo.fullName);
 				if (existing) {
-					await ctx.db.replace(existing._id, repo);
+					await ctx.db.replace("githubRepos", existing._id, repo);
 				} else {
 					await ctx.db.insert("githubRepos", repo);
 				}
@@ -44,7 +44,7 @@ export const applySync = internalMutation({
 		);
 
 		const rows = await ctx.db.query("githubRepos").collect();
-		await Promise.all(rows.filter((row) => !byKey.has(row.fullName)).map((row) => ctx.db.delete(row._id)));
+		await Promise.all(rows.filter((row) => !byKey.has(row.fullName)).map((row) => ctx.db.delete("githubRepos", row._id)));
 		const docs = await ctx.db
 			.query("knowledgeDocs")
 			.withIndex("by_source", (q) => q.eq("source", "github"))

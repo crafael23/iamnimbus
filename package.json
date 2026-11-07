@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "convex:dev": "convex dev",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p convex && tsc --noEmit -p tests"
@@ -33,6 +35,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@convex-dev/eslint-plugin": "5.0.1",
     "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/postcss": "^4.3.4",
     "@types/node": "^24.19.2",
@@ -40,6 +43,7 @@
     "@types/react-dom": "^19.3.0",
     "babel-plugin-react-compiler": "1.0.0",
     "convex-test": "^0.0.67",
+    "oxfmt": "0.75.0",
     "oxlint": "^1.91.0",
     "oxlint-tsgolint": "^7.0.2006",
     "tailwindcss": "^4.3.4",
