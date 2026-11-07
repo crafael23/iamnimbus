@@ -20,8 +20,17 @@ import {
  * chat begins.
  *
  * It plays by itself. Any key, or the skip button, goes straight to the
- * terminal. The dust is a canvas on the glass, outside the curved image,
- * and repaints only while it is being wiped.
+ * terminal.
+ *
+ * The glass is built the way dust on a screen actually looks, in layers over
+ * the curved image: a haze that softens the picture wherever dust remains, a
+ * film that blocks the tube's light (dark specks over bright title bars), a
+ * film that catches the room's light (pale specks over the dark tube), the
+ * motes a wipe knocks loose, and a faint reflection on the glass itself. The
+ * dust and the reflection drift a few pixels against the image while the
+ * camera settles, which is what places them on the glass. Every layer is
+ * still or finite: canvases repaint only while being wiped, and the motes
+ * stop when the last one lands.
  */
 
 type Stage = "dust" | "lit" | "clean" | "typing" | "answered" | "maximize" | "fade";
@@ -29,17 +38,48 @@ const ORDER: Stage[] = ["dust", "lit", "clean", "typing", "answered", "maximize"
 const reached = (stage: Stage, step: Stage) => ORDER.indexOf(stage) >= ORDER.indexOf(step);
 
 type Pt = { x: number; y: number };
+/** A line of a finger's print: fingers leave streaks, not clean bands. */
+type Streak = { offset: number; width: number; strength: number };
 /** One band of the wiping hand: where it sits across the hand, how wide, how hard it presses. */
-type Finger = { offset: number; width: number; strength: number };
+type Finger = { offset: number; width: number; strength: number; streaks: Streak[] };
+/** The dust a hand pushes aside piles up in a line along each of its edges. */
+type Ridge = { offset: number; width: number };
+type Hand = { fingers: Finger[]; ridges: Ridge[] };
+type Mote = {
+	x: number;
+	y: number;
+	vx: number;
+	vy: number;
+	age: number;
+	life: number;
+	size: number;
+	alpha: number;
+	/** Out of focus: in front of the glass, nearer the camera. */
+	bokeh: boolean;
+};
 type Glass = {
-	ctx: CanvasRenderingContext2D;
+	/** Dust catching the room's light. Also the one measured for coverage. */
+	scatter: CanvasRenderingContext2D;
+	/** Dust blocking the tube's light. */
+	occlude: CanvasRenderingContext2D;
+	/** Each layer as it was when the current sweep began. */
+	base: { scatter: CanvasRenderingContext2D; occlude: CanvasRenderingContext2D } | null;
 	probe: CanvasRenderingContext2D | null;
+	mask: CanvasRenderingContext2D | null;
+	veil: HTMLDivElement | null;
+	motes: CanvasRenderingContext2D | null;
+	sprite: HTMLCanvasElement;
 	width: number;
 	height: number;
 	hand: number;
 	/** Total dust alpha when fresh, for measuring how much has been wiped. */
 	initial: number;
 	measuredAt: number;
+	live: Mote[];
+	moteRaf: number;
+	moteAt: number;
+	/** Reduced motion: no floating motes. */
+	calm: boolean;
 };
 
 /** Share of the dust wiped before the screen wakes. */
@@ -54,8 +94,17 @@ const SWEEPS = [0.52, 0.26, 0.8, 0.03];
 const COMMAND = "whoami";
 const PROBE_W = 48;
 const PROBE_H = 27;
+/** The haze mask: coarse on purpose, it is blurred by scaling. */
+const MASK_W = 160;
+const MASK_H = 90;
+const MAX_MOTES = 380;
 /** When the machine was first switched on: the first commit. */
 const SINCE = Date.UTC(2026, 2, 11);
+
+/** Dust colours: lit film and specks, and the shadow they cast on the tube's light. */
+const LIT = "214, 204, 186";
+const FILM = [150, 140, 125] as const;
+const SHADE = [24, 22, 19] as const;
 
 const two = (n: number) => String(n).padStart(2, "0");
 const clockStamp = (d: Date) =>
@@ -63,16 +112,29 @@ const clockStamp = (d: Date) =>
 		.map(two)
 		.join(":");
 const timeOfDay = (d: Date) => `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+const smooth = (t: number) => t * t * (3 - 2 * t);
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-function makeHand(): Finger[] {
-	const n = 5 + Math.floor(Math.random() * 3);
+function makeHand(): Hand {
+	const r = Math.random;
+	const n = 5 + Math.floor(r() * 3);
 	const fingers = Array.from({ length: n }, (_, i) => ({
-		offset: (i / (n - 1) - 0.5) * 0.86 + (Math.random() - 0.5) * 0.06,
-		width: 0.07 + Math.random() * 0.1,
-		strength: 0.6 + Math.random() * 0.4,
+		offset: (i / (n - 1) - 0.5) * 0.86 + (r() - 0.5) * 0.06,
+		width: 0.07 + r() * 0.1,
+		strength: 0.78 + r() * 0.2,
+		streaks: Array.from({ length: 2 }, () => ({
+			offset: (r() - 0.5) * 0.6,
+			width: 0.3 + r() * 0.3,
+			strength: 0.6 + r() * 0.35,
+		})),
 	}));
 	// The palm: one broad, light pass under the fingers.
-	return [{ offset: 0, width: 0.9, strength: 0.42 }, ...fingers];
+	const palm = { offset: 0, width: 0.9, strength: 0.45, streaks: [] };
+	const ridges = [-1, 1].map((side) => ({
+		offset: side * (0.47 + (r() - 0.5) * 0.03),
+		width: 0.03 * (0.7 + r() * 0.6),
+	}));
+	return { fingers: [palm, ...fingers], ridges };
 }
 
 function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
@@ -83,84 +145,259 @@ function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, co
 	ctx.fillRect(x - r, y - r, r * 2, r * 2);
 }
 
-/** Years of settled dust: a warm film, room light, smudges, grain and stray fibres. */
-function paintDust(ctx: CanvasRenderingContext2D, w: number, h: number) {
-	const r = Math.random;
-	const big = Math.max(w, h);
-	ctx.fillStyle = "rgba(64, 58, 50, 0.76)";
-	ctx.fillRect(0, 0, w, h);
-	// A warm lamp low on the right, a cooler spill from the top left.
-	glow(ctx, w * 0.8, h * 1.04, big * 0.8, "rgba(138, 106, 68, 0.4)");
-	glow(ctx, w * 0.1, h * 0.02, big * 0.55, "rgba(92, 98, 104, 0.16)");
-	for (let i = 0; i < 20; i++) {
-		glow(
-			ctx,
-			r() * w,
-			r() * h,
-			(0.04 + r() * 0.13) * big,
-			r() < 0.5
-				? `rgba(26, 23, 20, ${0.1 + r() * 0.16})`
-				: `rgba(124, 112, 96, ${0.05 + r() * 0.1})`,
-		);
-	}
-	// Grain at half resolution, so specks land soft once scaled up.
-	const gw = Math.ceil(w / 2);
-	const gh = Math.ceil(h / 2);
-	const grain = document.createElement("canvas");
-	grain.width = gw;
-	grain.height = gh;
-	const gctx = grain.getContext("2d");
-	if (gctx) {
-		const img = gctx.createImageData(gw, gh);
-		const d = img.data;
-		for (let k = 0; k < d.length; k += 4) {
-			const v = r();
-			if (v > 0.84) {
-				const l = 150 + r() * 80;
-				d[k] = l;
-				d[k + 1] = l * 0.93;
-				d[k + 2] = l * 0.82;
-				d[k + 3] = (v - 0.84) * 520;
-			} else if (v < 0.09) {
-				d[k] = 12;
-				d[k + 1] = 10;
-				d[k + 2] = 8;
-				d[k + 3] = v * 900;
+/** A smooth random field in 0..1: four octaves of value noise. */
+function noiseField(w: number, h: number) {
+	const out = new Float32Array(w * h);
+	let amp = 1;
+	let total = 0;
+	for (const cells of [3, 6, 12, 24]) {
+		const gx = cells + 2;
+		const gy = Math.ceil((cells * h) / w) + 2;
+		const grid = Float32Array.from({ length: gx * gy }, Math.random);
+		for (let y = 0; y < h; y++) {
+			const fy = (y / h) * (gy - 2);
+			const y0 = Math.floor(fy);
+			const sy = smooth(fy - y0);
+			for (let x = 0; x < w; x++) {
+				const fx = (x / w) * (gx - 2);
+				const x0 = Math.floor(fx);
+				const sx = smooth(fx - x0);
+				const i = y0 * gx + x0;
+				const top = grid[i] + (grid[i + 1] - grid[i]) * sx;
+				const bottom = grid[i + gx] + (grid[i + gx + 1] - grid[i + gx]) * sx;
+				out[y * w + x] += amp * (top + (bottom - top) * sy);
 			}
 		}
-		gctx.putImageData(img, 0, 0);
-		ctx.drawImage(grain, 0, 0, w, h);
+		total += amp;
+		amp *= 0.5;
 	}
-	// Fibres and hairline scratches.
-	ctx.lineCap = "round";
-	for (let i = 0; i < 40; i++) {
+	for (let i = 0; i < out.length; i++) out[i] /= total;
+	return out;
+}
+
+/**
+ * Years of settled dust, painted twice from one field: the light it catches
+ * and the light it blocks. Thicker toward the bezel, lit by a lamp low on the
+ * right, with specks of every size, a few fibres and the ghost of an old wipe.
+ */
+function paintDust(scatter: CanvasRenderingContext2D, occlude: CanvasRenderingContext2D, w: number, h: number) {
+	const r = Math.random;
+	const big = Math.max(w, h);
+	const fw = 200;
+	const fh = Math.max(2, Math.round((fw * h) / w));
+	const field = noiseField(fw, fh);
+	const density = new Float32Array(fw * fh);
+	const lit = new ImageData(fw, fh);
+	const shade = new ImageData(fw, fh);
+	for (let y = 0; y < fh; y++) {
+		for (let x = 0; x < fw; x++) {
+			const i = y * fw + x;
+			const edge = Math.max(Math.abs((x + 0.5) / fw - 0.5), Math.abs((y + 0.5) / fh - 0.5)) * 2;
+			const d = clamp01(0.58 + (field[i] - 0.5) * 1.9 + 0.42 * smooth(clamp01((edge - 0.68) / 0.32)));
+			density[i] = d;
+			const k = i * 4;
+			lit.data[k] = FILM[0];
+			lit.data[k + 1] = FILM[1];
+			lit.data[k + 2] = FILM[2];
+			lit.data[k + 3] = d * 0.62 * 255;
+			shade.data[k] = SHADE[0];
+			shade.data[k + 1] = SHADE[1];
+			shade.data[k + 2] = SHADE[2];
+			shade.data[k + 3] = d * 0.5 * 255;
+		}
+	}
+	const small = document.createElement("canvas");
+	small.width = fw;
+	small.height = fh;
+	const sctx = small.getContext("2d");
+	for (const [ctx, img] of [
+		[scatter, lit],
+		[occlude, shade],
+	] as const) {
+		if (!sctx) break;
+		sctx.putImageData(img, 0, 0);
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = "high";
+		ctx.drawImage(small, 0, 0, w, h);
+	}
+
+	// The lamp warms the dust it reaches, and only the dust.
+	scatter.globalCompositeOperation = "source-atop";
+	glow(scatter, w * 0.8, h * 1.04, big * 0.8, "rgba(196, 150, 96, 0.42)");
+	glow(scatter, w * 0.1, h * 0.02, big * 0.55, "rgba(150, 160, 172, 0.2)");
+	scatter.globalCompositeOperation = "source-over";
+
+	// Someone wiped it once, long ago.
+	for (const ctx of [scatter, occlude]) {
+		ctx.globalCompositeOperation = "destination-out";
+		ctx.lineCap = "round";
+		for (let i = 0; i < 2; i++) {
+			const y = (0.2 + r() * 0.6) * h;
+			ctx.strokeStyle = "rgba(0,0,0,0.16)";
+			ctx.lineWidth = big * (0.08 + r() * 0.06);
+			ctx.beginPath();
+			ctx.moveTo(-0.1 * w, y);
+			ctx.quadraticCurveTo(w * (0.3 + r() * 0.4), y - h * (0.1 + r() * 0.15), w * 1.1, y + h * (r() - 0.5) * 0.2);
+			ctx.stroke();
+		}
+		ctx.globalCompositeOperation = "source-over";
+	}
+
+	// Specks: many tiny, a few large clumps, gathered where the film is thick
+	// and brightest where the light falls.
+	const light = (x: number, y: number) => {
+		const lamp = Math.hypot(x - w * 0.8, y - h * 1.04) / (big * 0.6);
+		const spill = Math.hypot(x - w * 0.1, y) / (big * 0.4);
+		return 0.4 + 0.6 * Math.exp(-lamp * lamp) + 0.25 * Math.exp(-spill * spill);
+	};
+	const dot = (ctx: CanvasRenderingContext2D, x: number, y: number, s: number) => {
+		if (s < 0.8) {
+			ctx.fillRect(x, y, s * 1.6, s * 1.6);
+		} else {
+			ctx.beginPath();
+			ctx.arc(x, y, s, 0, Math.PI * 2);
+			ctx.fill();
+		}
+	};
+	const tries = Math.round((w * h) / 520);
+	for (let i = 0; i < tries; i++) {
 		const x = r() * w;
 		const y = r() * h;
-		const len = 16 + r() * 150;
+		const d = density[Math.min(fh - 1, Math.floor((y / h) * fh)) * fw + Math.min(fw - 1, Math.floor((x / w) * fw))];
+		if (r() > 0.25 + 0.75 * d) continue;
+		const size = 0.35 + 2.6 * r() ** 4;
+		scatter.fillStyle = `rgba(${LIT}, ${clamp01((0.2 + r() * 0.45) * light(x, y))})`;
+		occlude.fillStyle = `rgba(16, 14, 12, ${0.4 + r() * 0.4})`;
+		const bits = size > 1.7 ? 3 : 1;
+		for (let b = 0; b < bits; b++) {
+			const bx = x + (b ? (r() - 0.5) * size * 2.4 : 0);
+			const by = y + (b ? (r() - 0.5) * size * 2.4 : 0);
+			const bs = b ? size * (0.4 + r() * 0.4) : size;
+			dot(scatter, bx, by, bs);
+			dot(occlude, bx, by, bs * 0.9);
+		}
+	}
+
+	// Fibres and hairs.
+	for (const ctx of [scatter, occlude]) ctx.lineCap = "round";
+	for (let i = 0; i < 14; i++) {
+		const x = r() * w;
+		const y = r() * h;
+		const len = 14 + r() * 90;
 		const a = r() * Math.PI * 2;
-		ctx.strokeStyle = `rgba(176, 164, 146, ${0.04 + r() * 0.09})`;
-		ctx.lineWidth = 0.5 + r() * 0.8;
-		ctx.beginPath();
-		ctx.moveTo(x, y);
-		ctx.quadraticCurveTo(
-			x + Math.cos(a + 0.6) * len * 0.6,
-			y + Math.sin(a + 0.6) * len * 0.6,
-			x + Math.cos(a) * len,
-			y + Math.sin(a) * len,
-		);
-		ctx.stroke();
+		const bend = (r() - 0.5) * 1.6;
+		const width = 0.5 + r() * 0.7;
+		for (const [ctx, color] of [
+			[scatter, `rgba(${LIT}, ${(0.12 + r() * 0.16) * light(x, y)})`],
+			[occlude, "rgba(16, 14, 12, 0.32)"],
+		] as const) {
+			ctx.strokeStyle = color;
+			ctx.lineWidth = width;
+			ctx.beginPath();
+			ctx.moveTo(x, y);
+			ctx.quadraticCurveTo(
+				x + Math.cos(a + bend) * len * 0.6,
+				y + Math.sin(a + bend) * len * 0.6,
+				x + Math.cos(a) * len,
+				y + Math.sin(a) * len,
+			);
+			ctx.stroke();
+		}
 	}
 }
 
-function dustLeft(glass: Glass, source: HTMLCanvasElement) {
+function dustLeft(glass: Glass) {
 	const p = glass.probe;
 	if (!p) return 0;
 	p.clearRect(0, 0, PROBE_W, PROBE_H);
-	p.drawImage(source, 0, 0, PROBE_W, PROBE_H);
+	p.drawImage(glass.scatter.canvas, 0, 0, PROBE_W, PROBE_H);
 	const data = p.getImageData(0, 0, PROBE_W, PROBE_H).data;
 	let sum = 0;
-	for (let k = 3; k < data.length; k += 4) sum += data[k] ?? 0;
+	for (let k = 3; k < data.length; k += 4) sum += data[k];
 	return sum;
+}
+
+/** The haze follows the dust: blur the image only where dust is left. */
+function updateHaze(glass: Glass) {
+	const { mask, veil } = glass;
+	if (!mask || !veil) return;
+	mask.globalCompositeOperation = "copy";
+	mask.drawImage(glass.scatter.canvas, 0, 0, MASK_W, MASK_H);
+	// Twice the film's alpha: a thin film already softens the picture.
+	mask.globalCompositeOperation = "lighter";
+	mask.drawImage(glass.scatter.canvas, 0, 0, MASK_W, MASK_H);
+	const url = `url(${mask.canvas.toDataURL()})`;
+	veil.style.setProperty("mask-image", url);
+	veil.style.setProperty("-webkit-mask-image", url);
+}
+
+function stepMotes(g: Glass, t: number) {
+	const ctx = g.motes;
+	if (!ctx) return;
+	const dt = Math.min(0.05, Math.max(0, t - g.moteAt) / 1000);
+	g.moteAt = t;
+	const drag = Math.exp(-2.6 * dt);
+	ctx.clearRect(0, 0, g.width, g.height);
+	g.live = g.live.filter((m) => (m.age += dt) < m.life);
+	ctx.fillStyle = `rgb(${LIT})`;
+	for (const m of g.live) {
+		m.vx *= drag;
+		m.vy = m.vy * drag + 46 * dt;
+		m.x += m.vx * dt;
+		m.y += m.vy * dt;
+		const k = m.age / m.life;
+		ctx.globalAlpha = m.alpha * Math.min(1, k * 6) * (1 - k);
+		if (m.bokeh) ctx.drawImage(g.sprite, m.x - m.size, m.y - m.size, m.size * 2, m.size * 2);
+		else ctx.fillRect(m.x, m.y, m.size, m.size);
+	}
+	ctx.globalAlpha = 1;
+	g.moteRaf = g.live.length ? requestAnimationFrame((next) => stepMotes(g, next)) : 0;
+}
+
+/** Dust the hand knocks off the glass: a short drift, then it settles out of view. */
+function shedMotes(g: Glass, a: Pt, b: Pt, nx: number, ny: number, hand: number) {
+	if (g.calm || !g.motes || g.live.length >= MAX_MOTES) return;
+	const r = Math.random;
+	const dx = b.x - a.x;
+	const dy = b.y - a.y;
+	const n = 3 + Math.floor(r() * 4);
+	for (let i = 0; i < n; i++) {
+		const t = r();
+		const across = (r() - 0.5) * 0.95 * hand;
+		const bokeh = r() < 0.07;
+		g.live.push({
+			x: a.x + dx * t + nx * across,
+			y: a.y + dy * t + ny * across,
+			vx: dx * (2 + r() * 5) + (r() - 0.5) * 40,
+			vy: dy * (2 + r() * 5) - (10 + r() * 50),
+			age: 0,
+			life: 0.8 + r() * 1.4,
+			size: bokeh ? 2 + r() * 4 : 0.5 + r() * 1.1,
+			alpha: bokeh ? 0.05 + r() * 0.08 : 0.25 + r() * 0.5,
+			bokeh,
+		});
+	}
+	if (!g.moteRaf) {
+		g.moteAt = performance.now();
+		g.moteRaf = requestAnimationFrame((next) => stepMotes(g, next));
+	}
+}
+
+function sizeCanvas(el: HTMLCanvasElement, w: number, h: number, dpr: number) {
+	el.width = Math.round(w * dpr);
+	el.height = Math.round(h * dpr);
+	const ctx = el.getContext("2d");
+	ctx?.scale(dpr, dpr);
+	return ctx;
+}
+
+function bokehSprite() {
+	const c = document.createElement("canvas");
+	c.width = 32;
+	c.height = 32;
+	const ctx = c.getContext("2d");
+	if (ctx) glow(ctx, 16, 16, 16, `rgba(${LIT}, 1)`);
+	return c;
 }
 
 export function DustIntro({ onReveal }: { onReveal: () => void }) {
@@ -174,7 +411,10 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 	const [landing, setLanding] = useState<CSSProperties | null>(null);
 
 	const root = useRef<HTMLDivElement>(null);
-	const canvas = useRef<HTMLCanvasElement>(null);
+	const scatterEl = useRef<HTMLCanvasElement>(null);
+	const occludeEl = useRef<HTMLCanvasElement>(null);
+	const motesEl = useRef<HTMLCanvasElement>(null);
+	const veilEl = useRef<HTMLDivElement>(null);
 	const glass = useRef<Glass | null>(null);
 	const raf = useRef(0);
 	const revealed = useRef(false);
@@ -197,43 +437,67 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 
 	const measure = useCallback(() => {
 		const g = glass.current;
-		const el = canvas.current;
-		if (!g || !el || !g.initial) return;
+		if (!g || !g.initial) return;
 		g.measuredAt = performance.now();
-		advance(1 - dustLeft(g, el) / g.initial);
+		updateHaze(g);
+		advance(1 - dustLeft(g) / g.initial);
 	}, [advance]);
 
-	/** Drag the hand from a to b: each finger clears a band, the palm thins the dust between. */
+	/**
+	 * The current sweep so far, drawn over the glass as it was when the sweep
+	 * began. One continuous stroke per line of the hand: drawing a sweep frame
+	 * by frame would double up at every joint and leave seams. Each finger
+	 * clears streaks, not a clean band; the palm thins the dust between; what
+	 * is pushed aside piles up along both edges of the hand.
+	 */
 	const wipe = useCallback(
-		(a: Pt, b: Pt, fingers: Finger[], scale = 1) => {
+		(pts: Pt[], hand: Hand, scale = 1) => {
 			const g = glass.current;
-			if (!g) return;
-			const dx = b.x - a.x;
-			const dy = b.y - a.y;
-			const len = Math.hypot(dx, dy);
-			if (len < 0.5) return;
-			const nx = -dy / len;
-			const ny = dx / len;
-			const hand = g.hand * scale;
-			const { ctx } = g;
-			ctx.globalCompositeOperation = "destination-out";
-			ctx.lineCap = "round";
-			for (const f of fingers) {
-				const ox = nx * f.offset * hand;
-				const oy = ny * f.offset * hand;
-				for (const [widen, pressure] of [
-					[1.7, 0.35],
-					[1, 1],
-				] as const) {
-					ctx.strokeStyle = `rgba(0,0,0,${f.strength * pressure})`;
-					ctx.lineWidth = f.width * hand * widen;
-					ctx.beginPath();
-					ctx.moveTo(a.x + ox, a.y + oy);
-					ctx.lineTo(b.x + ox, b.y + oy);
-					ctx.stroke();
+			if (!g?.base || pts.length < 2) return;
+			const size = g.hand * scale;
+			const normals = pts.map((_, i) => {
+				const a = pts[Math.max(0, i - 1)];
+				const b = pts[Math.min(pts.length - 1, i + 1)];
+				const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+				return { x: -(b.y - a.y) / len, y: (b.x - a.x) / len };
+			});
+			const line = (ctx: CanvasRenderingContext2D, offset: number, width: number, style: string) => {
+				ctx.strokeStyle = style;
+				ctx.lineWidth = width;
+				ctx.beginPath();
+				pts.forEach((p, i) => {
+					const x = p.x + normals[i].x * offset * size;
+					const y = p.y + normals[i].y * offset * size;
+					if (i) ctx.lineTo(x, y);
+					else ctx.moveTo(x, y);
+				});
+				ctx.stroke();
+			};
+			for (const [ctx, base, pile] of [
+				[g.scatter, g.base.scatter, `rgba(${FILM.join(",")}, 0.13)`],
+				[g.occlude, g.base.occlude, `rgba(${SHADE.join(",")}, 0.12)`],
+			] as const) {
+				ctx.save();
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.globalCompositeOperation = "copy";
+				ctx.drawImage(base.canvas, 0, 0);
+				ctx.restore();
+				ctx.lineCap = "round";
+				ctx.lineJoin = "round";
+				ctx.globalCompositeOperation = "destination-out";
+				for (const f of hand.fingers) {
+					line(ctx, f.offset, f.width * size * 1.3, `rgba(0,0,0,${f.strength * 0.72})`);
+					for (const s of f.streaks) {
+						line(ctx, f.offset + s.offset * f.width, s.width * f.width * size, `rgba(0,0,0,${s.strength * f.strength})`);
+					}
 				}
+				ctx.globalCompositeOperation = "source-over";
+				for (const ridge of hand.ridges) line(ctx, ridge.offset, ridge.width * size, pile);
 			}
-			ctx.globalCompositeOperation = "source-over";
+			const a = pts[pts.length - 2];
+			const b = pts[pts.length - 1];
+			const n = normals[normals.length - 1];
+			shedMotes(g, a, b, n.x, n.y, size);
 			if (performance.now() - g.measuredAt > 160) measure();
 		},
 		[measure],
@@ -250,7 +514,7 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 		const start = performance.now();
 		const per = SWEEP_MS + LIFT_MS;
 		let arc = -1;
-		let last: Pt = { x: 0, y: 0 };
+		let pts: Pt[] = [];
 		const frame = (t: number) => {
 			// A frame's timestamp can precede the call that scheduled it.
 			const k = Math.max(0, t - start) / per;
@@ -263,15 +527,27 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 			const f = ((k - i) * per) / SWEEP_MS;
 			if (f <= 1) {
 				// Ease in and out, as an arm would.
-				const eased = f * f * (3 - 2 * f);
-				const along = a.dir > 0 ? eased : 1 - eased;
+				const along = a.dir > 0 ? smooth(f) : 1 - smooth(f);
 				const p = {
 					x: (-0.1 + 1.2 * along) * g.width,
 					y: (a.y - 0.16 * Math.sin(Math.PI * along)) * g.height,
 				};
-				if (i !== arc) arc = i;
-				else wipe(last, p, a.hand, 1.45);
-				last = p;
+				if (i !== arc) {
+					// A new sweep starts from the glass as the last one left it.
+					arc = i;
+					pts = [];
+					if (g.base) {
+						for (const [base, layer] of [
+							[g.base.scatter, g.scatter],
+							[g.base.occlude, g.occlude],
+						] as const) {
+							base.globalCompositeOperation = "copy";
+							base.drawImage(layer.canvas, 0, 0);
+						}
+					}
+				}
+				pts.push(p);
+				wipe(pts, a.hand, 1.45);
 			}
 			raf.current = requestAnimationFrame(frame);
 		};
@@ -280,32 +556,56 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 
 	// Lay the dust before the first paint.
 	useLayoutEffect(() => {
-		const el = canvas.current;
-		const box = root.current;
-		if (!el || !box) return;
-		const { width, height } = box.getBoundingClientRect();
+		const scatter = scatterEl.current;
+		const occlude = occludeEl.current;
+		if (!scatter || !occlude) return;
+		// The glass layers overhang the tube so the drift never shows an edge.
+		const { width, height } = scatter.getBoundingClientRect();
 		const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-		el.width = Math.round(width * dpr);
-		el.height = Math.round(height * dpr);
-		const ctx = el.getContext("2d");
-		if (!ctx) return;
-		ctx.scale(dpr, dpr);
-		paintDust(ctx, width, height);
+		const sctx = sizeCanvas(scatter, width, height, dpr);
+		const octx = sizeCanvas(occlude, width, height, dpr);
+		if (!sctx || !octx) return;
+		paintDust(sctx, octx, width, height);
 		const probe = document.createElement("canvas");
 		probe.width = PROBE_W;
 		probe.height = PROBE_H;
+		const mask = document.createElement("canvas");
+		mask.width = MASK_W;
+		mask.height = MASK_H;
+		const copy = (ctx: CanvasRenderingContext2D) => {
+			const c = document.createElement("canvas");
+			c.width = ctx.canvas.width;
+			c.height = ctx.canvas.height;
+			return c.getContext("2d");
+		};
+		const baseScatter = copy(sctx);
+		const baseOcclude = copy(octx);
 		const g: Glass = {
-			ctx,
+			scatter: sctx,
+			occlude: octx,
+			base: baseScatter && baseOcclude ? { scatter: baseScatter, occlude: baseOcclude } : null,
 			probe: probe.getContext("2d", { willReadFrequently: true }),
+			mask: mask.getContext("2d"),
+			veil: veilEl.current,
+			motes: motesEl.current ? sizeCanvas(motesEl.current, width, height, 1) : null,
+			sprite: bokehSprite(),
 			width,
 			height,
 			hand: Math.min(240, Math.max(84, Math.min(width, height) * 0.22)),
 			initial: 0,
 			measuredAt: 0,
+			live: [],
+			moteRaf: 0,
+			moteAt: 0,
+			calm: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 		};
-		g.initial = dustLeft(g, el);
+		g.initial = dustLeft(g);
+		updateHaze(g);
 		glass.current = g;
-		return () => cancelAnimationFrame(raf.current);
+		return () => {
+			cancelAnimationFrame(raf.current);
+			cancelAnimationFrame(g.moteRaf);
+		};
 	}, []);
 
 	// The clock never stopped.
@@ -388,6 +688,7 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 
 	const lit = reached(stage, "lit");
 	const off = reached(stage, "maximize");
+	const clear = reached(stage, "clean") ? "intro-dust-clear" : "";
 
 	return (
 		<div
@@ -450,10 +751,13 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 			</div>
 
 			{stage !== "typing" && !reached(stage, "answered") && (
-				<canvas
-					ref={canvas}
-					className={`intro-dust ${reached(stage, "clean") ? "intro-dust-clear" : ""}`}
-				/>
+				<>
+					<div ref={veilEl} className={`intro-glass intro-veil ${clear}`} />
+					<canvas ref={occludeEl} className={`intro-glass intro-occlude ${clear}`} />
+					<canvas ref={scatterEl} className={`intro-glass intro-scatter ${clear}`} />
+					<canvas ref={motesEl} className={`intro-glass intro-motes ${clear}`} />
+					<div className={`intro-sheen ${clear}`} />
+				</>
 			)}
 
 			{lit && !burstDone && (

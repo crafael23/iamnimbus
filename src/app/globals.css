@@ -519,17 +519,93 @@
 	filter: brightness(2.4) blur(2px);
 }
 
-/* The dust sits on the glass: flat, over the curved image. */
-.intro-dust {
+/*
+ * The glass: flat, over the curved image, and a little larger than the tube
+ * so the camera drift never shows an edge. Bottom to top: the haze the dust
+ * casts on the picture, the light it blocks, the light it catches, the motes
+ * in the air, and the room reflected in the glass. Each is its own blend
+ * layer against the tube, so none of them may sit in a shared wrapper.
+ */
+.intro-glass {
 	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
+	inset: -12px;
+	width: calc(100% + 24px);
+	height: calc(100% + 24px);
+	pointer-events: none;
+	transition: opacity 1.2s ease-in;
+}
+.intro-veil {
+	backdrop-filter: blur(2.2px) saturate(0.8);
+	-webkit-backdrop-filter: blur(2.2px) saturate(0.8);
+	mask-size: 100% 100%;
+	-webkit-mask-size: 100% 100%;
+}
+.intro-occlude {
+	mix-blend-mode: multiply;
+}
+.intro-scatter {
+	mix-blend-mode: screen;
+}
+.intro-sheen {
+	position: absolute;
+	inset: -28px;
+	pointer-events: none;
+	background:
+		linear-gradient(
+			118deg,
+			transparent 16%,
+			rgb(255 255 255 / 0.035) 30%,
+			rgb(255 255 255 / 0.075) 39%,
+			rgb(255 255 255 / 0.02) 47%,
+			transparent 58%
+		),
+		radial-gradient(55% 40% at 12% 6%, rgb(200 214 230 / 0.07), transparent 70%);
+	mix-blend-mode: screen;
 	transition: opacity 1.2s ease-in;
 }
 .intro-dust-clear {
 	opacity: 0;
-	pointer-events: none;
+}
+
+/*
+ * The camera settles while the hand works. Near things move more than far
+ * ones: the reflection most, the dust on the glass less, the image behind
+ * the glass least. That parallax is what puts the dust on the glass.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.intro-tube {
+		animation: intro-drift-far 5.5s cubic-bezier(0.3, 0, 0.2, 1) both;
+	}
+	.intro-glass {
+		animation: intro-drift-near 5.5s cubic-bezier(0.3, 0, 0.2, 1) both;
+	}
+	.intro-sheen {
+		animation: intro-drift-sheen 5.5s cubic-bezier(0.3, 0, 0.2, 1) both;
+	}
+}
+@keyframes intro-drift-far {
+	from {
+		transform: translate(-3px, 1.5px);
+	}
+	to {
+		transform: none;
+	}
+}
+@keyframes intro-drift-near {
+	from {
+		transform: translate(-9px, 4px);
+	}
+	to {
+		transform: none;
+	}
+}
+@keyframes intro-drift-sheen {
+	from {
+		transform: translate(-22px, 8px);
+	}
+	to {
+		transform: none;
+	}
 }
 
 .intro-hint {
