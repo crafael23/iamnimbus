@@ -1,7 +1,8 @@
 import { fetchQuery } from "convex/nextjs";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { formatDate, PageShell } from "@/components/PageShell";
+import { formatDate } from "@/components/format";
+import { PageShell } from "@/components/PageShell";
 import { api } from "../../../convex/_generated/api";
 
 export const dynamic = "force-dynamic";

@@ -57,12 +57,16 @@ export const statusForSource = adminQuery({
 export const existingDocIds = internalQuery({
 	args: { keys: v.array(v.string()) },
 	handler: async (ctx, { keys }) => {
+		const docs = await Promise.all(
+			keys.map((key) => {
+				const id = ctx.db.normalizeId("knowledgeDocs", key);
+				return id ? ctx.db.get(id) : Promise.resolve(null);
+			}),
+		);
 		const live: { key: string; asOf?: AsOf }[] = [];
-		for (const key of keys) {
-			const id = ctx.db.normalizeId("knowledgeDocs", key);
-			const doc = id ? await ctx.db.get(id) : null;
-			if (doc && isScreened(doc)) live.push({ key, asOf: doc.asOf });
-		}
+		docs.forEach((doc, i) => {
+			if (doc && isScreened(doc)) live.push({ key: keys[i], asOf: doc.asOf });
+		});
 		return live;
 	},
 });

@@ -25,14 +25,10 @@ export const listThreadMessages = query({
 	handler: async (ctx, { threadId, guestToken, paginationOpts, streamArgs }) => {
 		const owner = await resolveChatOwner(ctx, guestToken, "read");
 		await authorizeThreadAccess(ctx, threadId, owner);
-		const streams = await syncStreams(ctx, components.agent, {
-			threadId,
-			streamArgs,
-		});
-		const paginated = await listUIMessages(ctx, components.agent, {
-			threadId,
-			paginationOpts,
-		});
+		const [streams, paginated] = await Promise.all([
+			syncStreams(ctx, components.agent, { threadId, streamArgs }),
+			listUIMessages(ctx, components.agent, { threadId, paginationOpts }),
+		]);
 		return { ...paginated, streams };
 	},
 });

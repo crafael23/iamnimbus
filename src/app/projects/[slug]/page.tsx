@@ -1,9 +1,11 @@
 import { fetchQuery } from "convex/nextjs";
+import type { FunctionReturnType } from "convex/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Markdown } from "@/components/Markdown";
-import { formatDate, PageShell } from "@/components/PageShell";
+import { formatDate } from "@/components/format";
+import { PageShell } from "@/components/PageShell";
 import { api } from "../../../../convex/_generated/api";
 
 export const dynamic = "force-dynamic";
@@ -55,85 +57,99 @@ export default async function ProjectPage({ params }: Props) {
 					))}
 				</div>
 
-				<aside className="h-fit border-t border-dashed border-line-strong pt-6 font-crt text-[19px] lg:sticky lg:top-24 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-					<dl className="space-y-6">
-						{project.year && (
-							<div>
-								<dt className="uppercase tracking-[0.1em] text-dim">year</dt>
-								<dd className="mt-1 text-ice">{project.year}</dd>
-							</div>
-						)}
-						<div>
-							<dt className="uppercase tracking-[0.1em] text-dim">stack</dt>
-							<dd className="mt-2 flex flex-wrap gap-2">
-								{project.stack.map((s) => (
-									<span key={s} className="border border-line-strong px-2 text-cyan">
-										{s}
-									</span>
-								))}
-							</dd>
-						</div>
-						{project.repo && (
-							<div>
-								<dt className="uppercase tracking-[0.1em] text-dim">github</dt>
-								<dd className="mt-1 space-y-1">
-									<a
-										href={project.repo.url}
-										target="_blank"
-										rel="noreferrer noopener"
-										className="block break-all text-cyan hover:text-ice"
-									>
-										{project.repo.fullName} ↗
-									</a>
-									{project.repo.languages.length > 0 && (
-										<p className="text-fog">
-											{project.repo.languages
-												.slice(0, 3)
-												.map((l) => `${l.name} ${l.percent}%`)
-												.join(" · ")}
-										</p>
-									)}
-									<p className="text-dim">
-										last push {formatDate(project.repo.pushedAt)}
-										{project.repo.stars > 0 && ` · ★ ${project.repo.stars}`}
-										{project.repo.archived && " · archived"}
-									</p>
-								</dd>
-							</div>
-						)}
-						{((!project.repo && (project.githubRepo || project.repoUrl)) || project.liveUrl) && (
-							<div>
-								<dt className="uppercase tracking-[0.1em] text-dim">links</dt>
-								<dd className="mt-1 space-y-1">
-									{!project.repo && (project.githubRepo || project.repoUrl) && (
-										<a
-											href={project.githubRepo ? `https://github.com/${project.githubRepo}` : project.repoUrl}
-											target="_blank"
-											rel="noreferrer noopener"
-											className="block text-cyan hover:text-ice"
-										>
-											repository ↗
-										</a>
-									)}
-									{project.liveUrl && (
-										<a href={project.liveUrl} target="_blank" rel="noreferrer noopener" className="block text-cyan hover:text-ice">
-											live ↗
-										</a>
-									)}
-								</dd>
-							</div>
-						)}
-						<div>
-							<dt className="uppercase tracking-[0.1em] text-dim">ask about it</dt>
-							<dd className="mt-1">
-								<Link href="/" className="text-cyan hover:text-ice">
-									open the terminal →
-								</Link>
-							</dd>
-						</div>
-					</dl>
-				</aside>
+				<ProjectFacts project={project} />
 			</article>
 		</PageShell>
+	);
+}
+
+type Project = NonNullable<FunctionReturnType<typeof api.projects.queries.getBySlug>>;
+
+function ProjectFacts({ project }: { project: Project }) {
+	return (
+		<aside className="h-fit border-t border-dashed border-line-strong pt-6 font-crt text-[19px] lg:sticky lg:top-24 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+			<dl className="space-y-6">
+				{project.year && (
+					<div>
+						<dt className="uppercase tracking-[0.1em] text-dim">year</dt>
+						<dd className="mt-1 text-ice">{project.year}</dd>
+					</div>
+				)}
+				<div>
+					<dt className="uppercase tracking-[0.1em] text-dim">stack</dt>
+					<dd className="mt-2 flex flex-wrap gap-2">
+						{project.stack.map((s) => (
+							<span key={s} className="border border-line-strong px-2 text-cyan">
+								{s}
+							</span>
+						))}
+					</dd>
+				</div>
+				{project.repo && <SyncedRepo repo={project.repo} />}
+				<ProjectLinks repoHref={fallbackRepoHref(project)} liveUrl={project.liveUrl} />
+				<div>
+					<dt className="uppercase tracking-[0.1em] text-dim">ask about it</dt>
+					<dd className="mt-1">
+						<Link href="/" className="text-cyan hover:text-ice">
+							open the terminal →
+						</Link>
+					</dd>
+				</div>
+			</dl>
+		</aside>
+	);
+}
+
+function SyncedRepo({ repo }: { repo: NonNullable<Project["repo"]> }) {
+	return (
+		<div>
+			<dt className="uppercase tracking-[0.1em] text-dim">github</dt>
+			<dd className="mt-1 space-y-1">
+				<a href={repo.url} target="_blank" rel="noreferrer noopener" className="block break-all text-cyan hover:text-ice">
+					{repo.fullName} ↗
+				</a>
+				{repo.languages.length > 0 && (
+					<p className="text-fog">
+						{repo.languages
+							.slice(0, 3)
+							.map((l) => `${l.name} ${l.percent}%`)
+							.join(" · ")}
+					</p>
+				)}
+				<p className="text-dim">
+					last push {formatDate(repo.pushedAt)}
+					{repo.stars > 0 && ` · ★ ${repo.stars}`}
+					{repo.archived && " · archived"}
+				</p>
+			</dd>
+		</div>
+	);
+}
+
+/** A repository link for projects without a synced repo: the chosen GitHub repo, else the hand-entered URL. */
+function fallbackRepoHref(project: Project) {
+	if (project.repo) return undefined;
+	if (project.githubRepo) return `https://github.com/${project.githubRepo}`;
+	return project.repoUrl || undefined;
+}
+
+function ProjectLinks({ repoHref, liveUrl }: { repoHref: string | undefined; liveUrl: string | undefined }) {
+	if (!repoHref && !liveUrl) return null;
+	return (
+		<div>
+			<dt className="uppercase tracking-[0.1em] text-dim">links</dt>
+			<dd className="mt-1 space-y-1">
+				{repoHref && (
+					<a href={repoHref} target="_blank" rel="noreferrer noopener" className="block text-cyan hover:text-ice">
+						repository ↗
+					</a>
+				)}
+				{liveUrl && (
+					<a href={liveUrl} target="_blank" rel="noreferrer noopener" className="block text-cyan hover:text-ice">
+						live ↗
+					</a>
+				)}
+			</dd>
+		</div>
 	);
 }

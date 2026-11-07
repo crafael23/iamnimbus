@@ -20,12 +20,3 @@ export function PageShell({ children }: { children: ReactNode }) {
 		</div>
 	);
 }
-
-export function formatDate(ms: number) {
-	return new Date(ms).toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-		timeZone: "UTC",
-	});
-}

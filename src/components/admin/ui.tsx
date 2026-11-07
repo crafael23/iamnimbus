@@ -1,6 +1,5 @@
 "use client";
 
-import { ConvexError } from "convex/values";
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Markdown } from "@/components/Markdown";
 
@@ -41,7 +40,7 @@ export function Field({
 }) {
 	return (
 		<div className="flex flex-col gap-2">
-			<label htmlFor={htmlFor} className="text-[12px] text-fog">
+			<label id={`${htmlFor}-label`} htmlFor={htmlFor} className="text-[12px] text-fog">
 				{label}
 			</label>
 			{children}
@@ -114,6 +113,8 @@ export function MarkdownEditor({
 			<div className="grid lg:grid-cols-2">
 				<textarea
 					id={id}
+					// Named by the Field around it, which labels this id.
+					aria-labelledby={`${id}-label`}
 					value={value}
 					rows={rows}
 					onChange={(e) => onChange(e.target.value)}
@@ -135,31 +136,6 @@ export function MarkdownEditor({
 			</div>
 		</div>
 	);
-}
-
-export function errorMessage(error: unknown) {
-	if (error instanceof ConvexError) {
-		return typeof error.data === "string" ? error.data : JSON.stringify(error.data);
-	}
-	return error instanceof Error ? error.message : "Something went wrong";
-}
-
-export function slugify(title: string) {
-	return title
-		.toLowerCase()
-		.normalize("NFKD")
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 80);
-}
-
-export function formatTime(ms: number) {
-	return new Date(ms).toLocaleString("en-US", {
-		month: "short",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
 }
 
 export function PanelHeader({

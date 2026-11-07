@@ -5,16 +5,8 @@ import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { type AsOf, asOfLabel } from "../../../convex/_lib/asOf";
-import {
-	Button,
-	errorMessage,
-	Field,
-	formatTime,
-	inputClass,
-	MarkdownEditor,
-	PanelHeader,
-	StatusBadge,
-} from "./ui";
+import { Button, Field, inputClass, MarkdownEditor, PanelHeader, StatusBadge } from "./ui";
+import { errorMessage, formatTime } from "./utils";
 
 const NAMESPACES = ["projects", "history", "skills", "goals", "blog", "github"] as const;
 type Namespace = (typeof NAMESPACES)[number];
@@ -168,23 +160,22 @@ function KnowledgeForm({
 	const update = useMutation(api.knowledge.mutations.update);
 
 	const save = async () => {
+		const asOf = parseAsOf(form.asOf);
+		if (asOf === null) {
+			setError("Write the as-of date as YYYY or YYYY-MM, or the word current.");
+			return;
+		}
+		const fields = { title: form.title, content: form.content, asOf };
 		setSaving(true);
 		setError(null);
 		try {
-			const asOf = parseAsOf(form.asOf);
-			if (asOf === null) {
-				setError("Write the as-of date as YYYY or YYYY-MM, or the word current.");
-				return;
-			}
-			const fields = { title: form.title, content: form.content, asOf };
 			if (docId) await update({ docId, ...fields });
 			else await create({ namespace: form.namespace, ...fields });
 			onClose();
 		} catch (e) {
 			setError(errorMessage(e));
-		} finally {
-			setSaving(false);
 		}
+		setSaving(false);
 	};
 
 	return (

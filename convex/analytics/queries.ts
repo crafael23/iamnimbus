@@ -33,6 +33,7 @@ export const summary = adminQuery({
 			monthSpend: 0,
 			monthBudget: 0,
 		};
+		const byTopic = new Map(result.topics.map((row) => [row.topic, row]));
 		for (const event of events) {
 			if (event.kind === "session" && event.tier) result.sessions[event.tier]++;
 			if (event.kind === "message" && event.tier) result.messages[event.tier]++;
@@ -42,7 +43,7 @@ export const summary = adminQuery({
 				if (event.atGate) result.atGate++;
 			}
 			if (event.kind === "topic") {
-				const row = result.topics.find((r) => r.topic === event.topic);
+				const row = event.topic ? byTopic.get(event.topic) : undefined;
 				if (row) row.count++;
 			}
 		}

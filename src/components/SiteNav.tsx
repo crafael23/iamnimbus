@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
+import { SIGN_IN_PATH } from "./authLinks";
 
 const LINKS = [
 	{ href: "/", label: "terminal" },
@@ -78,10 +79,8 @@ export function SiteNav({ status }: { status?: ReactNode }) {
 							sign out
 						</button>
 					) : (
-						// Route handler that redirects to WorkOS, not a page: a plain anchor on purpose.
-						// oxlint-disable-next-line nextjs/no-html-link-for-pages
 						<a
-							href="/sign-in"
+							href={SIGN_IN_PATH}
 							className="whitespace-nowrap text-cyan transition-colors hover:text-ice"
 						>
 							sign in

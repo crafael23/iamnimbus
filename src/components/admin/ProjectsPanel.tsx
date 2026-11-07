@@ -1,20 +1,14 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import type { FunctionReturnType } from "convex/server";
+import { useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { SkeletonRows } from "./KnowledgePanel";
-import {
-	Button,
-	errorMessage,
-	Field,
-	inputClass,
-	MarkdownEditor,
-	PanelHeader,
-	slugify,
-	StatusBadge,
-} from "./ui";
+import { Button, Field, inputClass, MarkdownEditor, PanelHeader, StatusBadge } from "./ui";
+import { TitleSlugFields } from "./TitleSlugFields";
+import { errorMessage } from "./utils";
 
 export function ProjectsPanel() {
 	const projects = useQuery(api.projects.queries.list);
@@ -75,8 +69,8 @@ const LONG_FIELDS = [
 	["outcome", "Outcome", "What happened. What you would do differently."],
 ] as const;
 
-function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; onClose: () => void }) {
-	const [form, setForm] = useState({
+function initialProjectForm(project: Doc<"projects"> | null) {
+	return {
 		title: project?.title ?? "",
 		slug: project?.slug ?? "",
 		summary: project?.summary ?? "",
@@ -89,42 +83,35 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 		githubRepo: project?.githubRepo ?? "",
 		repoUrl: project?.repoUrl ?? "",
 		liveUrl: project?.liveUrl ?? "",
-		order: project?.order ?? 0,
-	});
-	const [slugTouched, setSlugTouched] = useState(Boolean(project));
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const save = useMutation(api.projects.mutations.save);
-	const remove = useMutation(api.projects.mutations.remove);
-	const repos = useQuery(api.github.queries.repos);
-	const takenBy = (r: NonNullable<typeof repos>[number]) =>
-		r.linkedProject && r.linkedProject._id !== project?._id ? r.linkedProject.title : null;
+		order: String(project?.order ?? 0),
+	};
+}
+
+type ProjectFormState = ReturnType<typeof initialProjectForm>;
+
+/** The form as the save mutation takes it: blanks become undefined, order a number. */
+function projectFields(projectId: Id<"projects"> | undefined, form: ProjectFormState) {
+	const order = Number(form.order);
+	return {
+		projectId,
+		...form,
+		stack: form.stack.split(","),
+		year: form.year.trim() || undefined,
+		githubRepo: form.githubRepo || undefined,
+		repoUrl: form.githubRepo ? undefined : form.repoUrl.trim() || undefined,
+		liveUrl: form.liveUrl.trim() || undefined,
+		order: Number.isFinite(order) ? order : 0,
+	};
+}
+
+function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; onClose: () => void }) {
+	const [form, setForm] = useState(() => initialProjectForm(project));
+	// Only read while typing the title: changing it never needs a render.
+	const slugTouched = useRef(Boolean(project));
 	const index = useQuery(
 		api.knowledge.queries.statusForSource,
 		project ? { source: "project", sourceKey: project._id } : "skip",
 	);
-
-	const submit = async () => {
-		setBusy(true);
-		setError(null);
-		try {
-			await save({
-				projectId: project?._id,
-				...form,
-				stack: form.stack.split(","),
-				year: form.year.trim() || undefined,
-				githubRepo: form.githubRepo || undefined,
-				repoUrl: form.githubRepo ? undefined : form.repoUrl.trim() || undefined,
-				liveUrl: form.liveUrl.trim() || undefined,
-				order: Number(form.order) || 0,
-			});
-			onClose();
-		} catch (e) {
-			setError(errorMessage(e));
-		} finally {
-			setBusy(false);
-		}
-	};
 
 	const set = (key: keyof typeof form) => (value: string) => setForm({ ...form, [key]: value });
 
@@ -136,29 +123,14 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 				action={index ? <StatusBadge status={index.status} chunks={index.chunkCount} error={index.error} /> : undefined}
 			/>
 			<div className="grid gap-5">
-				<div className="grid gap-5 sm:grid-cols-2">
-					<Field label="Title" htmlFor="p-title">
-						<input
-							id="p-title"
-							value={form.title}
-							onChange={(e) =>
-								setForm({ ...form, title: e.target.value, slug: slugTouched ? form.slug : slugify(e.target.value) })
-							}
-							className={inputClass}
-						/>
-					</Field>
-					<Field label="Slug" htmlFor="p-slug" hint={`/projects/${form.slug || "…"}`}>
-						<input
-							id="p-slug"
-							value={form.slug}
-							onChange={(e) => {
-								setSlugTouched(true);
-								set("slug")(e.target.value);
-							}}
-							className={inputClass}
-						/>
-					</Field>
-				</div>
+				<TitleSlugFields
+					idPrefix="p"
+					basePath="/projects/"
+					title={form.title}
+					slug={form.slug}
+					slugTouchedRef={slugTouched}
+					onChange={(next) => setForm({ ...form, ...next })}
+				/>
 				<Field label="Summary" htmlFor="p-summary" hint="One sentence for the index card.">
 					<input id="p-summary" value={form.summary} onChange={(e) => set("summary")(e.target.value)} className={inputClass} />
 				</Field>
@@ -174,41 +146,13 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 							id="p-order"
 							type="number"
 							value={form.order}
-							onChange={(e) => setForm({ ...form, order: Number(e.target.value) })}
+							onChange={(e) => set("order")(e.target.value)}
 							className={inputClass}
 						/>
 					</Field>
 				</div>
 				<div className="grid gap-5 sm:grid-cols-2">
-					<Field
-						label="GitHub repository"
-						htmlFor="p-github"
-						hint={
-							repos === undefined
-								? "Loading synced repositories…"
-								: repos.length === 0
-									? "Run a GitHub sync to choose a repository."
-									: "One repository per project. Its details show on the project page."
-						}
-					>
-						<select
-							id="p-github"
-							value={form.githubRepo}
-							onChange={(e) => set("githubRepo")(e.target.value)}
-							className={inputClass}
-						>
-							<option value="">None</option>
-							{repos?.map((r) => (
-								<option key={r.fullName} value={r.fullName} disabled={Boolean(takenBy(r))}>
-									{r.label}
-									{takenBy(r) ? ` (linked to ${takenBy(r)})` : ""}
-								</option>
-							))}
-							{form.githubRepo && repos && !repos.some((r) => r.fullName === form.githubRepo) && (
-								<option value={form.githubRepo}>{form.githubRepo} (not in the last sync)</option>
-							)}
-						</select>
-					</Field>
+					<RepoPicker projectId={project?._id} value={form.githubRepo} onChange={set("githubRepo")} />
 					<Field label="Live URL" htmlFor="p-live">
 						<input id="p-live" value={form.liveUrl} onChange={(e) => set("liveUrl")(e.target.value)} placeholder="https://" className={inputClass} />
 					</Field>
@@ -223,29 +167,102 @@ function ProjectForm({ project, onClose }: { project: Doc<"projects"> | null; on
 						<MarkdownEditor id={`p-${key}`} value={form[key]} onChange={set(key)} rows={8} />
 					</Field>
 				))}
-				{error && <p className="text-[13px] text-danger">{error}</p>}
-				<div className="flex flex-wrap gap-2">
-					<Button tone="primary" onClick={() => void submit()} disabled={busy || !form.title.trim()}>
-						{busy ? "Saving…" : "Save and index"}
-					</Button>
-					<Button tone="ghost" onClick={onClose}>
-						Cancel
-					</Button>
-					<span className="flex-1" />
-					{project && (
-						<Button
-							tone="danger"
-							onClick={() => {
-								if (window.confirm("Delete this project and remove it from the terminal's memory?")) {
-									remove({ projectId: project._id }).then(onClose, (e) => setError(errorMessage(e)));
-								}
-							}}
-						>
-							Delete
-						</Button>
-					)}
-				</div>
+				<ProjectActions projectId={project?._id} form={form} onClose={onClose} />
 			</div>
 		</div>
+	);
+}
+
+type SyncedRepo = FunctionReturnType<typeof api.github.queries.repos>[number];
+
+function repoHint(repos: SyncedRepo[] | undefined) {
+	if (repos === undefined) return "Loading synced repositories…";
+	return repos.length === 0
+		? "Run a GitHub sync to choose a repository."
+		: "One repository per project. Its details show on the project page.";
+}
+
+/** One repository per project: a repo linked to another project shows that project and can't be picked. */
+function RepoPicker({
+	projectId,
+	value,
+	onChange,
+}: {
+	projectId: Id<"projects"> | undefined;
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	const repos = useQuery(api.github.queries.repos);
+	const takenBy = (r: SyncedRepo) => (r.linkedProject && r.linkedProject._id !== projectId ? r.linkedProject.title : null);
+	const missing = Boolean(value) && repos !== undefined && !repos.some((r) => r.fullName === value);
+
+	return (
+		<Field label="GitHub repository" htmlFor="p-github" hint={repoHint(repos)}>
+			<select id="p-github" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+				<option value="">None</option>
+				{repos?.map((r) => (
+					<option key={r.fullName} value={r.fullName} disabled={Boolean(takenBy(r))}>
+						{r.label}
+						{takenBy(r) ? ` (linked to ${takenBy(r)})` : ""}
+					</option>
+				))}
+				{missing && <option value={value}>{value} (not in the last sync)</option>}
+			</select>
+		</Field>
+	);
+}
+
+function ProjectActions({
+	projectId,
+	form,
+	onClose,
+}: {
+	projectId: Id<"projects"> | undefined;
+	form: ProjectFormState;
+	onClose: () => void;
+}) {
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const save = useMutation(api.projects.mutations.save);
+	const remove = useMutation(api.projects.mutations.remove);
+
+	const submit = async () => {
+		const fields = projectFields(projectId, form);
+		setBusy(true);
+		setError(null);
+		try {
+			await save(fields);
+			onClose();
+		} catch (e) {
+			setError(errorMessage(e));
+		}
+		setBusy(false);
+	};
+
+	return (
+		<>
+			{error && <p className="text-[13px] text-danger">{error}</p>}
+			<div className="flex flex-wrap gap-2">
+				<Button tone="primary" onClick={() => void submit()} disabled={busy || !form.title.trim()}>
+					{busy ? "Saving…" : "Save and index"}
+				</Button>
+				<Button tone="ghost" onClick={onClose}>
+					Cancel
+				</Button>
+				<span className="flex-1" />
+				{projectId && (
+					<Button
+						tone="danger"
+						onClick={() => {
+							if (window.confirm("Delete this project and remove it from the terminal's memory?")) {
+								remove({ projectId }).then(onClose, (e) => setError(errorMessage(e)));
+							}
+						}}
+					>
+						Delete
+					</Button>
+				)}
+			</div>
+		</>
 	);
 }

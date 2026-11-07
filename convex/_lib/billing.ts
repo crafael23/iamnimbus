@@ -89,7 +89,7 @@ export async function reserveTurn(ctx: MutationCtx, tier: Tier, now = Date.now()
 		.query("aiReservations")
 		.withIndex("by_createdAt", (q) => q.lte("createdAt", now - RESERVATION_TTL_MS))
 		.take(10);
-	for (const row of expired) await ctx.db.delete(row._id);
+	await Promise.all(expired.map((row) => ctx.db.delete(row._id)));
 	return await ctx.db.insert("aiReservations", { amountUsd, createdAt: now });
 }
 
@@ -112,17 +112,20 @@ export async function recordSpend(ctx: MutationCtx, costUsd: number, now = Date.
 	if (!(costUsd > 0)) return;
 	const keys = periods(now);
 	const shard = Math.floor(Math.random() * SPEND_SHARDS);
-	for (const period of [keys.month, keys.day]) {
-		const row = await ctx.db
-			.query("aiSpend")
-			.withIndex("by_period_shard", (q) => q.eq("period", period).eq("shard", shard))
-			.unique();
-		if (row) {
-			await ctx.db.patch(row._id, { costUsd: row.costUsd + costUsd, calls: row.calls + 1 });
-		} else {
-			await ctx.db.insert("aiSpend", { period, shard, costUsd, calls: 1 });
-		}
-	}
+	// The month's row and the day's row are separate documents.
+	await Promise.all(
+		[keys.month, keys.day].map(async (period) => {
+			const row = await ctx.db
+				.query("aiSpend")
+				.withIndex("by_period_shard", (q) => q.eq("period", period).eq("shard", shard))
+				.unique();
+			if (row) {
+				await ctx.db.patch(row._id, { costUsd: row.costUsd + costUsd, calls: row.calls + 1 });
+			} else {
+				await ctx.db.insert("aiSpend", { period, shard, costUsd, calls: 1 });
+			}
+		}),
+	);
 }
 
 /** List prices per million tokens, used only when the gateway reports no cost. */

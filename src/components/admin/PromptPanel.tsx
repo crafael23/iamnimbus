@@ -5,7 +5,8 @@ import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { SkeletonRows } from "./KnowledgePanel";
-import { Button, errorMessage, Field, formatTime, inputClass, PanelHeader } from "./ui";
+import { Button, Field, inputClass, PanelHeader } from "./ui";
+import { errorMessage, formatTime } from "./utils";
 
 export function PromptPanel() {
 	const versions = useQuery(api.prompts.queries.listVersions);
@@ -35,9 +36,8 @@ function PromptEditor({ versions }: { versions: Version[] }) {
 			await fn();
 		} catch (e) {
 			setError(errorMessage(e));
-		} finally {
-			setBusy(false);
 		}
+		setBusy(false);
 	};
 
 	return (

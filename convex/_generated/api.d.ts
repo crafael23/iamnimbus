@@ -9,6 +9,7 @@
  */
 
 import type * as _lib_analytics from "../_lib/analytics.js";
+import type * as _lib_asOf from "../_lib/asOf.js";
 import type * as _lib_auth from "../_lib/auth.js";
 import type * as _lib_billing from "../_lib/billing.js";
 import type * as _lib_customFunctions from "../_lib/customFunctions.js";
@@ -59,6 +60,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "_lib/analytics": typeof _lib_analytics;
+  "_lib/asOf": typeof _lib_asOf;
   "_lib/auth": typeof _lib_auth;
   "_lib/billing": typeof _lib_billing;
   "_lib/customFunctions": typeof _lib_customFunctions;

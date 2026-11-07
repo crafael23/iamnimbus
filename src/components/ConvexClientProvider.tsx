@@ -9,16 +9,19 @@ import {
 	useAccessToken,
 } from "@workos-inc/authkit-nextjs/components";
 
+/**
+ * Convex calls this hook itself, inside its provider. It is handed over on an
+ * object so the component never refers to a hook as a plain value.
+ */
+const authKit = { useAuth: useAuthFromAuthKit };
+
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
 	const [convex] = useState(() => {
 		return new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 	});
 	return (
 		<AuthKitProvider>
-			<ConvexProviderWithAuth
-				client={convex}
-				useAuth={useAuthFromAuthKit}
-			>
+			<ConvexProviderWithAuth client={convex} {...authKit}>
 				{children}
 			</ConvexProviderWithAuth>
 		</AuthKitProvider>
@@ -39,16 +42,15 @@ function useAuthFromAuthKit() {
 				return null;
 			}
 
+			let token: string | null | undefined;
 			try {
-				if (forceRefreshToken) {
-					return (await refresh()) ?? null;
-				}
-
-				return (await getAccessToken()) ?? null;
+				if (forceRefreshToken) token = await refresh();
+				else token = await getAccessToken();
 			} catch (error) {
 				console.error("Failed to get access token:", error);
 				return null;
 			}
+			return token ?? null;
 		},
 		[user, refresh, getAccessToken],
 	);

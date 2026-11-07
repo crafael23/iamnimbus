@@ -19,7 +19,7 @@ export const prune = internalMutation({
 			.query("analyticsEvents")
 			.withIndex("by_day_kind", (q) => q.lt("day", cutoff))
 			.take(250);
-		for (const row of rows) await ctx.db.delete(row._id);
+		await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
 		if (rows.length === 250) await ctx.scheduler.runAfter(0, internal.analytics.internal.prune, {});
 		return null;
 	},

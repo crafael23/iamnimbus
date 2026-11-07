@@ -14,39 +14,44 @@ export const applySync = internalMutation({
 		const now = Date.now();
 		// Project links saved before keys were normalized: lowercase them first so
 		// the lookups below (and every later save) see them.
-		for (const project of await ctx.db.query("projects").collect()) {
-			if (project.githubRepo && project.githubRepo !== repoKey(project.githubRepo)) {
-				await ctx.db.patch(project._id, { githubRepo: repoKey(project.githubRepo) });
-			}
-		}
+		const projects = await ctx.db.query("projects").collect();
+		await Promise.all(
+			projects.flatMap((project) =>
+				project.githubRepo && project.githubRepo !== repoKey(project.githubRepo)
+					? [ctx.db.patch(project._id, { githubRepo: repoKey(project.githubRepo) })]
+					: [],
+			),
+		);
 		// Rows and docs from before keys were normalized drop out below and are
 		// recreated under their lowercase key.
-		const keep = new Set(repos.map((r) => repoKey(r.fullName)));
-		for (const synced of repos) {
-			const repo = { ...synced, fullName: repoKey(synced.fullName), syncedAt: now };
-			const existing = await findRepo(ctx, repo.fullName);
-			if (existing) {
-				await ctx.db.replace(existing._id, repo);
-			} else {
-				await ctx.db.insert("githubRepos", repo);
-			}
-			await refreshRepoDoc(ctx, repo.fullName);
-		}
+		// One entry per key, so no two writes below touch the same repo.
+		const byKey = new Map(
+			repos.map((synced) => {
+				const fullName = repoKey(synced.fullName);
+				return [fullName, { ...synced, fullName, syncedAt: now }];
+			}),
+		);
+		await Promise.all(
+			[...byKey.values()].map(async (repo) => {
+				const existing = await findRepo(ctx, repo.fullName);
+				if (existing) {
+					await ctx.db.replace(existing._id, repo);
+				} else {
+					await ctx.db.insert("githubRepos", repo);
+				}
+				await refreshRepoDoc(ctx, repo.fullName);
+			}),
+		);
 
-		let removed = 0;
-		for (const row of await ctx.db.query("githubRepos").collect()) {
-			if (!keep.has(row.fullName)) await ctx.db.delete(row._id);
-		}
+		const rows = await ctx.db.query("githubRepos").collect();
+		await Promise.all(rows.filter((row) => !byKey.has(row.fullName)).map((row) => ctx.db.delete(row._id)));
 		const docs = await ctx.db
 			.query("knowledgeDocs")
 			.withIndex("by_source", (q) => q.eq("source", "github"))
 			.collect();
-		for (const doc of docs) {
-			if (doc.sourceKey && !keep.has(doc.sourceKey)) {
-				await removeDerivedDoc(ctx, "github", doc.sourceKey);
-				removed++;
-			}
-		}
+		const gone = docs.flatMap((doc) => (doc.sourceKey && !byKey.has(doc.sourceKey) ? [doc.sourceKey] : []));
+		await Promise.all(gone.map((key) => removeDerivedDoc(ctx, "github", key)));
+		const removed = gone.length;
 
 		await ctx.db.insert("githubSyncRuns", {
 			username,

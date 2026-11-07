@@ -6,8 +6,10 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useEffectEvent,
 	useRef,
 	useState,
+	useSyncExternalStore,
 } from "react";
 
 /**
@@ -461,23 +463,290 @@ function sizeCanvas(el: HTMLCanvasElement, w: number, h: number, dpr: number) {
 	return ctx;
 }
 
-export function DustIntro({ onReveal }: { onReveal: () => void }) {
-	const [stage, setStage] = useState<Stage>("dust");
-	const [gone, setGone] = useState(false);
-	const [now, setNow] = useState(() => new Date());
-	const [typed, setTyped] = useState(0);
-	// The windows bend with the rest of the tube when the tube is curved.
-	const [curved] = useState(() => Boolean(document.getElementById("crt-curve")));
-	const [burstDone, setBurstDone] = useState(false);
-	const [landing, setLanding] = useState<CSSProperties | null>(null);
+/**
+ * Move the hand from a to b, `u0`→`u1` of the way through its sweep, in
+ * steps of a few pixels. A line of a finger is on the glass while it lies
+ * inside the finger's contact, which narrows with pressure, so strokes
+ * taper to a point. Lines near the edge of the contact skip in long runs,
+ * which frays the edges like a dry brush. Every line on the glass clears
+ * it fully: the strokes are near black. A few leave a faint smear.
+ */
+function wipeGlass(
+	g: Glass,
+	a: Pt,
+	b: Pt,
+	u0: number,
+	u1: number,
+	fingers: Finger[],
+	scale: number,
+	from: Pt | null,
+	smears: boolean,
+) {
+	const dx = b.x - a.x;
+	const dy = b.y - a.y;
+	const len = Math.hypot(dx, dy);
+	if (len < 0.5) return from;
+	const nx = -dy / len;
+	const ny = dx / len;
+	// Turn the hand smoothly from the last frame's heading to this one's,
+	// or its outer fingers jump on tight curves and leave gaps.
+	const n0 = from ?? { x: nx, y: ny };
+	const hand = g.hand * scale;
+	const steps = Math.max(1, Math.ceil(len / 3));
+	const { film, residue } = g;
+	// Full removal with round ends: overlaps between runs and frames
+	// clear nothing twice, so they leave no seams.
+	film.globalCompositeOperation = "destination-out";
+	film.lineCap = "round";
+	film.lineJoin = "round";
+	film.strokeStyle = "#000";
+	if (residue) {
+		residue.lineCap = "round";
+		residue.strokeStyle = `rgba(${DUST.join(",")}, 0.045)`;
+	}
+	for (const f of fingers) {
+		if (u1 < f.t0 || u0 > f.t1) continue;
+		const fw = f.width * hand;
+		for (const s of f.bristles) {
+			const smear = smears && residue && s.seed % 6 < 1;
+			let run = 0;
+			const flush = () => {
+				if (!run) return;
+				film.stroke();
+				if (smear) residue.stroke();
+				run = 0;
+			};
+			for (let k = 0; k <= steps; k++) {
+				const t = k / steps;
+				const u = u0 + (u1 - u0) * t;
+				// The contact patch shrinks as the finger lifts: every line draws
+				// in toward the middle and thins, so the stroke narrows smoothly.
+				const contact = pressure(f, u);
+				const edge = Math.abs(s.offset);
+				// Only the outer lines run dry, and more so under light pressure.
+				const dry = Math.max(0, edge - 0.55) / 0.45 + (1 - contact) * 0.3;
+				const on = contact > 0.04 && vnoise(s.seed + u * 14) >= dry * dry * 0.85;
+				if (!on) {
+					flush();
+					continue;
+				}
+				// Fingers are never quite parallel: each drifts a little across the sweep.
+				const off = (f.offset + 0.025 * Math.sin(u * 4 + f.wave)) * hand + s.offset * fw * 0.5 * contact;
+				const hx = n0.x + (nx - n0.x) * t;
+				const hy = n0.y + (ny - n0.y) * t;
+				const hl = Math.hypot(hx, hy) || 1;
+				// A fingertip is round: its outer lines trail its middle.
+				const lag = s.offset * s.offset * fw * 0.45;
+				const x = a.x + dx * t + (hx / hl) * off - (dx / len) * lag;
+				const y = a.y + dy * t + (hy / hl) * off - (dy / len) * lag;
+				if (!run) {
+					film.lineWidth = Math.max(0.8, s.width * fw * (0.4 + 0.6 * contact));
+					film.beginPath();
+					film.moveTo(x, y);
+					if (smear) {
+						residue.lineWidth = film.lineWidth * 0.6;
+						residue.beginPath();
+						residue.moveTo(x, y);
+					}
+				}
+				film.lineTo(x, y);
+				if (smear) residue.lineTo(x, y);
+				run += 1;
+			}
+			flush();
+		}
+	}
+	film.globalCompositeOperation = "source-over";
+	return { x: nx, y: ny };
+}
 
-	const root = useRef<HTMLDivElement>(null);
+/**
+ * Broad arcing sweeps of the fingers across the glass, like a forearm
+ * clearing a desk, then passes of the flat hand over whatever dust is
+ * left, back and forth, until the glass is clean.
+ */
+function sweepGlass(g: Glass, raf: { id: number }, measure: () => void, onClean: () => void) {
+	// No two sweeps alike: each arcs, tilts and reaches a little differently.
+	const passes: Pass[] = SWEEPS.map((y, i) => ({
+		y,
+		dir: i % 2 ? -1 : 1,
+		hand: makeHand(),
+		bow: 0.12 + Math.random() * 0.1,
+		tilt: (Math.random() - 0.5) * 0.12,
+		from: -0.14 + Math.random() * 0.12,
+		to: 1.02 + Math.random() * 0.12,
+		scale: 1.5,
+		ms: SWEEP_MS,
+		lift: LIFT_MS,
+		smear: true,
+	}));
+	let i = 0;
+	let start = performance.now();
+	let palms = 0;
+	let heading: Pt | null = null;
+	let last: { p: Pt; u: number } | null = null;
+	const frame = (t: number) => {
+		// A frame's timestamp can precede the call that scheduled it.
+		let elapsed = Math.max(0, t - start);
+		if (elapsed >= passes[i].ms + passes[i].lift) {
+			const prev = passes[i];
+			const next = passes[i + 1] ?? (palms < MAX_PALMS ? nextPalm(g, -prev.dir) : null);
+			if (!next) {
+				measure();
+				onClean();
+				return;
+			}
+			if (!passes[i + 1]) {
+				palms += 1;
+				passes.push(next);
+			}
+			i += 1;
+			start = t;
+			elapsed = 0;
+			heading = null;
+			last = null;
+		}
+		const a = passes[i];
+		// Ease in and out, as an arm would.
+		const u = smooth(Math.min(1, elapsed / a.ms));
+		const along = a.dir > 0 ? u : 1 - u;
+		const p = { x: (a.from + (a.to - a.from) * along) * g.width, y: pathY(a, along) * g.height };
+		if (last && last.u < 1) {
+			heading = wipeGlass(g, last.p, p, last.u, u, a.hand, a.scale, heading, a.smear);
+			if (performance.now() - g.measuredAt > 110) measure();
+		}
+		last = { p, u };
+		raf.id = requestAnimationFrame(frame);
+	};
+	raf.id = requestAnimationFrame(frame);
+}
+
+/** Lay the dust on the glass, and get it ready to be wiped. */
+function layGlass(
+	film: HTMLCanvasElement,
+	residueEl: HTMLCanvasElement | null,
+	sharp: HTMLDivElement | null,
+	haze: HTMLDivElement | null,
+): Glass | null {
+	// The glass overhangs the tube so the camera drift never shows an edge.
+	const { width, height } = film.getBoundingClientRect();
+	const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+	const fctx = sizeCanvas(film, width, height, dpr);
+	if (!fctx) return null;
+	paintFilm(fctx, width, height, dpr);
+	const probe = document.createElement("canvas");
+	probe.width = PROBE_W;
+	probe.height = PROBE_H;
+	const mask = document.createElement("canvas");
+	mask.width = Math.round(Math.sqrt((MASK_AREA * width) / height));
+	mask.height = Math.round(MASK_AREA / mask.width);
+	const g: Glass = {
+		film: fctx,
+		residue: residueEl ? sizeCanvas(residueEl, width, height, dpr) : null,
+		probe: probe.getContext("2d", { willReadFrequently: true }),
+		mask: mask.getContext("2d"),
+		sharp,
+		haze,
+		done: false,
+		width,
+		height,
+		hand: Math.min(240, Math.max(84, Math.min(width, height) * 0.22)),
+		initial: 0,
+		measuredAt: 0,
+		maskBusy: false,
+		maskUrls: [],
+	};
+	g.initial = dustLeft(g);
+	updateHaze(g);
+	return g;
+}
+
+/**
+ * The dusty glass: laid before the first paint, wiped by the hand after a
+ * moment, and unmasked once it is clean.
+ */
+function useDustGlass({
+	onWake,
+	onClean,
+	clean,
+}: {
+	/** Enough dust is gone for the screen to wake. */
+	onWake: () => void;
+	/** The hand has finished: no dust is left. */
+	onClean: () => void;
+	clean: boolean;
+}) {
 	const filmEl = useRef<HTMLCanvasElement>(null);
 	const residueEl = useRef<HTMLCanvasElement>(null);
 	const hazeEl = useRef<HTMLDivElement>(null);
 	const sharpEl = useRef<HTMLDivElement>(null);
 	const glass = useRef<Glass | null>(null);
-	const raf = useRef(0);
+	const raf = useRef({ id: 0 });
+
+	const measure = useEffectEvent(() => {
+		const g = glass.current;
+		if (!g || !g.initial) return;
+		g.measuredAt = performance.now();
+		updateHaze(g);
+		if (1 - dustLeft(g) / g.initial >= WAKE_AT) onWake();
+	});
+	const finished = useEffectEvent(onClean);
+
+	// Lay the dust before the first paint.
+	useLayoutEffect(() => {
+		const film = filmEl.current;
+		if (!film) return;
+		const g = layGlass(film, residueEl.current, sharpEl.current, hazeEl.current);
+		if (!g) return;
+		glass.current = g;
+		const frame = raf.current;
+		return () => {
+			cancelAnimationFrame(frame.id);
+			for (const u of g.maskUrls) URL.revokeObjectURL(u);
+		};
+	}, []);
+
+	// The hand arrives after a moment with the dormant clock.
+	useEffect(() => {
+		const frame = raf.current;
+		const id = window.setTimeout(() => {
+			const g = glass.current;
+			if (g) sweepGlass(g, frame, () => measure(), () => finished());
+			else finished();
+		}, DORMANT_MS);
+		return () => window.clearTimeout(id);
+	}, []);
+
+	// Once the glass is clean the sharp screen shows everywhere; the blurred
+	// copy fades out over it.
+	useEffect(() => {
+		const g = glass.current;
+		if (!clean || !g || g.done) return;
+		g.done = true;
+		g.sharp?.style.setProperty("mask-image", "none");
+		g.sharp?.style.setProperty("-webkit-mask-image", "none");
+	}, [clean]);
+
+	const stop = useCallback(() => cancelAnimationFrame(raf.current.id), []);
+	return { filmEl, residueEl, hazeEl, sharpEl, stop };
+}
+
+/** The tube's curve filter is put in place before the intro mounts, and stays. */
+const noSubscribe = () => () => {};
+const hasCurve = () => Boolean(document.getElementById("crt-curve"));
+const noCurve = () => false;
+
+export function DustIntro({ onReveal }: { onReveal: () => void }) {
+	const [stage, setStage] = useState<Stage>("dust");
+	const [gone, setGone] = useState(false);
+	// The clock never stopped.
+	const now = useClock(stage !== "fade");
+	const typed = useTyping(stage === "typing", () => setStage("answered"));
+	// The windows bend with the rest of the tube when the tube is curved.
+	const curved = useSyncExternalStore(noSubscribe, hasCurve, noCurve);
+	const [landing, setLanding] = useState<CSSProperties | null>(null);
+
+	const root = useRef<HTMLDivElement>(null);
 	const revealed = useRef(false);
 
 	const reveal = useCallback(() => {
@@ -486,249 +755,20 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 		onReveal();
 	}, [onReveal]);
 
+	const { filmEl, residueEl, hazeEl, sharpEl, stop } = useDustGlass({
+		onWake: () => setStage((s) => (s === "dust" ? "lit" : s)),
+		onClean: () => setStage((s) => (reached(s, "clean") ? s : "clean")),
+		clean: reached(stage, "clean"),
+	});
+
 	const finish = useCallback(() => {
-		cancelAnimationFrame(raf.current);
+		stop();
 		reveal();
 		setStage("fade");
-	}, [reveal]);
+	}, [reveal, stop]);
 
-	const advance = useCallback((wiped: number) => {
-		if (wiped >= WAKE_AT) setStage((s) => (s === "dust" ? "lit" : s));
-	}, []);
 
-	const measure = useCallback(() => {
-		const g = glass.current;
-		if (!g || !g.initial) return;
-		g.measuredAt = performance.now();
-		updateHaze(g);
-		advance(1 - dustLeft(g) / g.initial);
-	}, [advance]);
 
-	/**
-	 * Move the hand from a to b, `u0`→`u1` of the way through its sweep, in
-	 * steps of a few pixels. A line of a finger is on the glass while it lies
-	 * inside the finger's contact, which narrows with pressure, so strokes
-	 * taper to a point. Lines near the edge of the contact skip in long runs,
-	 * which frays the edges like a dry brush. Every line on the glass clears
-	 * it fully: the strokes are near black. A few leave a faint smear.
-	 */
-	const wipe = useCallback(
-		(a: Pt, b: Pt, u0: number, u1: number, fingers: Finger[], scale: number, from: Pt | null, smears: boolean) => {
-			const g = glass.current;
-			if (!g) return null;
-			const dx = b.x - a.x;
-			const dy = b.y - a.y;
-			const len = Math.hypot(dx, dy);
-			if (len < 0.5) return from;
-			const nx = -dy / len;
-			const ny = dx / len;
-			// Turn the hand smoothly from the last frame's heading to this one's,
-			// or its outer fingers jump on tight curves and leave gaps.
-			const n0 = from ?? { x: nx, y: ny };
-			const hand = g.hand * scale;
-			const steps = Math.max(1, Math.ceil(len / 3));
-			const { film, residue } = g;
-			// Full removal with round ends: overlaps between runs and frames
-			// clear nothing twice, so they leave no seams.
-			film.globalCompositeOperation = "destination-out";
-			film.lineCap = "round";
-			film.lineJoin = "round";
-			film.strokeStyle = "#000";
-			if (residue) {
-				residue.lineCap = "round";
-				residue.strokeStyle = `rgba(${DUST.join(",")}, 0.045)`;
-			}
-			for (const f of fingers) {
-				if (u1 < f.t0 || u0 > f.t1) continue;
-				const fw = f.width * hand;
-				for (const s of f.bristles) {
-					const smear = smears && residue && s.seed % 6 < 1;
-					let run = 0;
-					const flush = () => {
-						if (!run) return;
-						film.stroke();
-						if (smear) residue.stroke();
-						run = 0;
-					};
-					for (let k = 0; k <= steps; k++) {
-						const t = k / steps;
-						const u = u0 + (u1 - u0) * t;
-						// The contact patch shrinks as the finger lifts: every line draws
-						// in toward the middle and thins, so the stroke narrows smoothly.
-						const contact = pressure(f, u);
-						const edge = Math.abs(s.offset);
-						// Only the outer lines run dry, and more so under light pressure.
-						const dry = Math.max(0, edge - 0.55) / 0.45 + (1 - contact) * 0.3;
-						const on = contact > 0.04 && vnoise(s.seed + u * 14) >= dry * dry * 0.85;
-						if (!on) {
-							flush();
-							continue;
-						}
-						// Fingers are never quite parallel: each drifts a little across the sweep.
-						const off = (f.offset + 0.025 * Math.sin(u * 4 + f.wave)) * hand + s.offset * fw * 0.5 * contact;
-						const hx = n0.x + (nx - n0.x) * t;
-						const hy = n0.y + (ny - n0.y) * t;
-						const hl = Math.hypot(hx, hy) || 1;
-						// A fingertip is round: its outer lines trail its middle.
-						const lag = s.offset * s.offset * fw * 0.45;
-						const x = a.x + dx * t + (hx / hl) * off - (dx / len) * lag;
-						const y = a.y + dy * t + (hy / hl) * off - (dy / len) * lag;
-						if (!run) {
-							film.lineWidth = Math.max(0.8, s.width * fw * (0.4 + 0.6 * contact));
-							film.beginPath();
-							film.moveTo(x, y);
-							if (smear) {
-								residue.lineWidth = film.lineWidth * 0.6;
-								residue.beginPath();
-								residue.moveTo(x, y);
-							}
-						}
-						film.lineTo(x, y);
-						if (smear) residue.lineTo(x, y);
-						run++;
-					}
-					flush();
-				}
-			}
-			film.globalCompositeOperation = "source-over";
-			if (performance.now() - g.measuredAt > 110) measure();
-			return { x: nx, y: ny };
-		},
-		[measure],
-	);
-
-	/**
-	 * Broad arcing sweeps of the fingers across the glass, like a forearm
-	 * clearing a desk, then passes of the flat hand over whatever dust is
-	 * left, back and forth, until the glass is clean.
-	 */
-	const sweep = useCallback(() => {
-		const g = glass.current;
-		if (!g) {
-			setStage("clean");
-			return;
-		}
-		// No two sweeps alike: each arcs, tilts and reaches a little differently.
-		const passes: Pass[] = SWEEPS.map((y, i) => ({
-			y,
-			dir: i % 2 ? -1 : 1,
-			hand: makeHand(),
-			bow: 0.12 + Math.random() * 0.1,
-			tilt: (Math.random() - 0.5) * 0.12,
-			from: -0.14 + Math.random() * 0.12,
-			to: 1.02 + Math.random() * 0.12,
-			scale: 1.5,
-			ms: SWEEP_MS,
-			lift: LIFT_MS,
-			smear: true,
-		}));
-		let i = 0;
-		let start = performance.now();
-		let palms = 0;
-		let heading: Pt | null = null;
-		let last: { p: Pt; u: number } | null = null;
-		const frame = (t: number) => {
-			// A frame's timestamp can precede the call that scheduled it.
-			let elapsed = Math.max(0, t - start);
-			if (elapsed >= passes[i].ms + passes[i].lift) {
-				const prev = passes[i];
-				const next = passes[i + 1] ?? (palms < MAX_PALMS ? nextPalm(g, -prev.dir) : null);
-				if (!next) {
-					measure();
-					setStage((s) => (reached(s, "clean") ? s : "clean"));
-					return;
-				}
-				if (!passes[i + 1]) {
-					palms++;
-					passes.push(next);
-				}
-				i++;
-				start = t;
-				elapsed = 0;
-				heading = null;
-				last = null;
-			}
-			const a = passes[i];
-			// Ease in and out, as an arm would.
-			const u = smooth(Math.min(1, elapsed / a.ms));
-			const along = a.dir > 0 ? u : 1 - u;
-			const p = { x: (a.from + (a.to - a.from) * along) * g.width, y: pathY(a, along) * g.height };
-			if (last && last.u < 1) heading = wipe(last.p, p, last.u, u, a.hand, a.scale, heading, a.smear);
-			last = { p, u };
-			raf.current = requestAnimationFrame(frame);
-		};
-		raf.current = requestAnimationFrame(frame);
-	}, [wipe, measure]);
-
-	// Lay the dust before the first paint.
-	useLayoutEffect(() => {
-		const film = filmEl.current;
-		if (!film) return;
-		// The glass overhangs the tube so the camera drift never shows an edge.
-		const { width, height } = film.getBoundingClientRect();
-		const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-		const fctx = sizeCanvas(film, width, height, dpr);
-		if (!fctx) return;
-		paintFilm(fctx, width, height, dpr);
-		const probe = document.createElement("canvas");
-		probe.width = PROBE_W;
-		probe.height = PROBE_H;
-		const mask = document.createElement("canvas");
-		mask.width = Math.round(Math.sqrt((MASK_AREA * width) / height));
-		mask.height = Math.round(MASK_AREA / mask.width);
-		const g: Glass = {
-			film: fctx,
-			residue: residueEl.current ? sizeCanvas(residueEl.current, width, height, dpr) : null,
-			probe: probe.getContext("2d", { willReadFrequently: true }),
-			mask: mask.getContext("2d"),
-			sharp: sharpEl.current,
-			haze: hazeEl.current,
-			done: false,
-			width,
-			height,
-			hand: Math.min(240, Math.max(84, Math.min(width, height) * 0.22)),
-			initial: 0,
-			measuredAt: 0,
-			maskBusy: false,
-			maskUrls: [],
-		};
-		g.initial = dustLeft(g);
-		updateHaze(g);
-		glass.current = g;
-		return () => {
-			cancelAnimationFrame(raf.current);
-			for (const u of g.maskUrls) URL.revokeObjectURL(u);
-		};
-	}, []);
-
-	// The clock never stopped.
-	const live = stage !== "fade";
-	useEffect(() => {
-		if (!live) return;
-		const timer = { id: 0 };
-		const tick = () => {
-			setNow(new Date());
-			timer.id = window.setTimeout(tick, 1000 - (Date.now() % 1000));
-		};
-		timer.id = window.setTimeout(tick, 1000 - (Date.now() % 1000));
-		return () => window.clearTimeout(timer.id);
-	}, [live]);
-
-	// The hand arrives after a moment with the dormant clock.
-	useEffect(() => {
-		const id = window.setTimeout(sweep, DORMANT_MS);
-		return () => window.clearTimeout(id);
-	}, [sweep]);
-
-	// Once the glass is clean the sharp screen shows everywhere; the blurred
-	// copy fades out over it.
-	useEffect(() => {
-		const g = glass.current;
-		if (!reached(stage, "clean") || !g || g.done) return;
-		g.done = true;
-		g.sharp?.style.setProperty("mask-image", "none");
-		g.sharp?.style.setProperty("-webkit-mask-image", "none");
-	}, [stage]);
 
 	// The sequence after the glass is wiped.
 	useEffect(() => {
@@ -765,27 +805,18 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 		return () => window.clearTimeout(id);
 	}, [stage, reveal]);
 
-	// whoami, typed by a hand that has not done this in a while.
-	useEffect(() => {
-		if (stage !== "typing") return;
-		const id =
-			typed < COMMAND.length
-				? window.setTimeout(() => setTyped((n) => n + 1), 85 + Math.random() * 90)
-				: window.setTimeout(() => setStage("answered"), 420);
-		return () => window.clearTimeout(id);
-	}, [stage, typed]);
-
 	// Any key skips to the terminal.
+	const onKey = useEffectEvent((e: KeyboardEvent) => {
+		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		if ((e.target as Element | null)?.closest?.("[data-intro-skip]")) return;
+		finish();
+	});
+	const listening = stage !== "fade";
 	useEffect(() => {
-		if (stage === "fade") return;
-		const onKey = (e: KeyboardEvent) => {
-			if (e.metaKey || e.ctrlKey || e.altKey) return;
-			if ((e.target as Element | null)?.closest?.("[data-intro-skip]")) return;
-			finish();
-		};
+		if (!listening) return;
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [stage, finish]);
+	}, [listening]);
 
 	if (gone) return null;
 
@@ -794,95 +825,45 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 	const onGlass = stage !== "typing" && !reached(stage, "answered");
 	const clear = reached(stage, "clean") ? "intro-dust-clear" : "";
 	const curve = curved ? { filter: "url(#crt-curve)" } : undefined;
+	const windows = lit && <Windows now={now} stage={stage} typed={typed} landing={landing} />;
 	const hazeStyle = { filter: `${curved ? "url(#crt-curve) " : ""}blur(10px) brightness(0.7) saturate(0.5)` };
-	const windows = lit && (
-					<>
-						<IntroWindow
-							title="top — nimbus@grid"
-							className={`intro-win-top ${off ? "intro-win-off" : ""}`}
-							delay={0}
-						>
-							<Top now={now} />
-						</IntroWindow>
-						<IntroWindow
-							title="archive"
-							className={`intro-win-archive ${off ? "intro-win-off" : ""}`}
-							delay={260}
-						>
-							<Archive />
-						</IntroWindow>
-						<IntroWindow
-							title="tty1"
-							className={`intro-win-tty ${off ? "intro-win-max" : ""}`}
-							bodyStyle={off ? (landing ?? undefined) : undefined}
-							delay={520}
-						>
-							{reached(stage, "typing") ? (
-								<>
-									<p>
-										<span className="text-dim">$</span> {COMMAND.slice(0, typed)}
-										{stage === "typing" && <span className="cursor-block" />}
-									</p>
-									{reached(stage, "answered") && (
-										<>
-											<p className="line-in glow-text">nimbus</p>
-											{!off && (
-												<p>
-													<span className="text-dim">$</span> <span className="cursor-block cursor-blink" />
-												</p>
-											)}
-										</>
-									)}
-								</>
-							) : (
-								<p>
-									<span className="text-dim">$</span> <span className="cursor-block cursor-blink" />
-								</p>
-							)}
-						</IntroWindow>
-					</>
-				);
 
 	return (
 		<div
 			ref={root}
-			aria-hidden
 			className={`crt-screen intro ${stage === "fade" ? "intro-out" : ""}`}
 			onTransitionEnd={(e) => {
 				if (e.target === e.currentTarget && e.propertyName === "opacity") setGone(true);
 			}}
 		>
-			<div ref={sharpEl} className="intro-tube intro-tube-masked font-crt" style={curve}>
-				{windows}
-			</div>
-			{/*
-			 * Under dust the screen's light scatters: the same windows, blurred and
-			 * dimmed, masked to where dust is left. Clean glass shows them sharp.
-			 */}
-			{onGlass && (
-				<div ref={hazeEl} className={`intro-tube intro-tube-masked intro-tube-haze font-crt ${clear}`} style={hazeStyle}>
+			{/* The picture is decoration; only the skip button is for everyone. No box, so the blends stay unisolated. */}
+			<div aria-hidden className="contents">
+				<div ref={sharpEl} className="intro-tube intro-tube-masked font-crt" style={curve}>
 					{windows}
 				</div>
-			)}
+				{/*
+				 * Under dust the screen's light scatters: the same windows, blurred and
+				 * dimmed, masked to where dust is left. Clean glass shows them sharp.
+				 */}
+				{onGlass && (
+					<div ref={hazeEl} className={`intro-tube intro-tube-masked intro-tube-haze font-crt ${clear}`} style={hazeStyle}>
+						{windows}
+					</div>
+				)}
 
 
-			{/* The clock stays legible through the dust: it sits above the glow. */}
-			<div className="intro-tube intro-tube-front font-crt" style={curve}>
-				<p className={`intro-clock crt-text ${lit ? "intro-clock-out" : ""}`}>{clockStamp(now)}</p>
+				{/* The clock stays legible through the dust: it sits above the glow. */}
+				<div className="intro-tube intro-tube-front font-crt" style={curve}>
+					<p className={`intro-clock crt-text ${lit ? "intro-clock-out" : ""}`}>{clockStamp(now)}</p>
+				</div>
+
+				{onGlass && <canvas ref={filmEl} className={`intro-glass intro-film ${clear}`} />}
+				<canvas ref={residueEl} className={`intro-glass intro-residue ${off ? "intro-dust-clear" : ""}`} />
+				{onGlass && <div className={`intro-sheen ${clear}`} />}
+
+				{lit && <StaticBurst />}
+
 			</div>
-
-			{onGlass && <canvas ref={filmEl} className={`intro-glass intro-film ${clear}`} />}
-			<canvas ref={residueEl} className={`intro-glass intro-residue ${off ? "intro-dust-clear" : ""}`} />
-			{onGlass && <div className={`intro-sheen ${clear}`} />}
-
-			{lit && !burstDone && (
-				<div
-					className="crt-static"
-					onAnimationEnd={(e) => {
-						if (e.animationName === "static-burst") setBurstDone(true);
-					}}
-				/>
-			)}
 
 			<p className={`intro-hint font-crt ${reached(stage, "maximize") ? "intro-hint-off" : ""}`}>
 				<button type="button" data-intro-skip onClick={finish} className="intro-skip">
@@ -891,6 +872,109 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 			</p>
 		</div>
 	);
+}
+
+/** The screen's windows, behind the glass. */
+function Windows({
+	now,
+	stage,
+	typed,
+	landing,
+}: {
+	now: Date;
+	stage: Stage;
+	typed: number;
+	landing: CSSProperties | null;
+}) {
+	const off = reached(stage, "maximize");
+	return (
+		<>
+			<IntroWindow title="top — nimbus@grid" className={`intro-win-top ${off ? "intro-win-off" : ""}`} delay={0}>
+				<Top now={now} />
+			</IntroWindow>
+			<IntroWindow title="archive" className={`intro-win-archive ${off ? "intro-win-off" : ""}`} delay={260}>
+				<Archive />
+			</IntroWindow>
+			<IntroWindow
+				title="tty1"
+				className={`intro-win-tty ${off ? "intro-win-max" : ""}`}
+				bodyStyle={off ? (landing ?? undefined) : undefined}
+				delay={520}
+			>
+				<Session stage={stage} typed={typed} />
+			</IntroWindow>
+		</>
+	);
+}
+
+/** The session window: `whoami`, typed, and the machine's answer. */
+function Session({ stage, typed }: { stage: Stage; typed: number }) {
+	const prompt = (
+		<p>
+			<span className="text-dim">$</span> <span className="cursor-block cursor-blink" />
+		</p>
+	);
+	if (!reached(stage, "typing")) return prompt;
+	return (
+		<>
+			<p>
+				<span className="text-dim">$</span> {COMMAND.slice(0, typed)}
+				{stage === "typing" && <span className="cursor-block" />}
+			</p>
+			{reached(stage, "answered") && (
+				<>
+					<p className="line-in glow-text">nimbus</p>
+					{!reached(stage, "maximize") && prompt}
+				</>
+			)}
+		</>
+	);
+}
+
+/** A burst of static as the dormant screen wakes, gone once it has played. */
+function StaticBurst() {
+	const [done, setDone] = useState(false);
+	if (done) return null;
+	return (
+		<div
+			className="crt-static"
+			onAnimationEnd={(e) => {
+				if (e.animationName === "static-burst") setDone(true);
+			}}
+		/>
+	);
+}
+
+/** `whoami`, typed by a hand that has not done this in a while, while `typing`. */
+function useTyping(typing: boolean, onTyped: () => void) {
+	const [typed, setTyped] = useState(0);
+	const done = useEffectEvent(onTyped);
+	useEffect(() => {
+		if (!typing) return;
+		const more = typed < COMMAND.length;
+		const id = window.setTimeout(
+			() => (more ? setTyped((n) => n + 1) : done()),
+			more ? 85 + Math.random() * 90 : 420,
+		);
+		return () => window.clearTimeout(id);
+	}, [typing, typed]);
+	return typed;
+}
+
+/** The time, ticking on the second while `live`. */
+function useClock(live: boolean) {
+	const [now, setNow] = useState(() => new Date());
+	useEffect(() => {
+		if (!live) return;
+		const timer = { id: 0 };
+		const tick = () => {
+			setNow(new Date());
+			timer.id = window.setTimeout(tick, 1000 - (Date.now() % 1000));
+		};
+		timer.id = window.setTimeout(tick, 1000 - (Date.now() % 1000));
+		return () => window.clearTimeout(timer.id);
+	}, [live]);
+	return now;
 }
 
 function IntroWindow({

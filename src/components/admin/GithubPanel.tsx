@@ -1,14 +1,17 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SkeletonRows } from "./KnowledgePanel";
-import { Button, errorMessage, formatTime, PanelHeader, StatusBadge } from "./ui";
+import { Button, PanelHeader, StatusBadge } from "./ui";
+import { errorMessage, formatTime } from "./utils";
+
+type SyncInfo = FunctionReturnType<typeof api.github.queries.lastRun>;
 
 export function GithubPanel() {
 	const info = useQuery(api.github.queries.lastRun);
-	const docs = useQuery(api.knowledge.queries.list, { namespace: "github" });
 	const sync = useAction(api.github.actions.sync);
 	const [busy, setBusy] = useState(false);
 	const [result, setResult] = useState<string | null>(null);
@@ -19,17 +22,11 @@ export function GithubPanel() {
 		setError(null);
 		setResult(null);
 		try {
-			const r = await sync({});
-			setResult(
-				`Synced ${r.synced} repositories${r.removed ? `, removed ${r.removed}` : ""}${
-					r.orgs.length ? ` (organizations scanned: ${r.orgs.join(", ")})` : ""
-				}.`,
-			);
+			setResult(syncSummary(await sync({})));
 		} catch (e) {
 			setError(errorMessage(e));
-		} finally {
-			setBusy(false);
 		}
+		setBusy(false);
 	};
 
 	return (
@@ -43,52 +40,70 @@ export function GithubPanel() {
 					</Button>
 				}
 			/>
-			{info === undefined ? (
-				<SkeletonRows />
-			) : (
-				<dl className="grid gap-6 text-[13px] sm:grid-cols-4">
-					<div>
-						<dt className="text-dim">account</dt>
-						<dd className="mt-1 text-ice">{info.username ?? "GITHUB_USERNAME not set"}</dd>
-					</div>
-					<div>
-						<dt className="text-dim">organizations</dt>
-						<dd className="mt-1 text-ice">
-							{info.orgs.length ? info.orgs.join(", ") : "public memberships only (set GITHUB_ORGS)"}
-						</dd>
-					</div>
-					<div>
-						<dt className="text-dim">token</dt>
-						<dd className="mt-1 text-ice">{info.hasToken ? "GITHUB_TOKEN set" : "none (60 requests/hour)"}</dd>
-					</div>
-					<div>
-						<dt className="text-dim">last sync</dt>
-						<dd className={`mt-1 ${info.run?.status === "error" ? "text-danger" : "text-ice"}`}>
-							{info.run
-								? `${formatTime(info.run.finishedAt)}, ${
-										info.run.status === "ok" ? `${info.run.repoCount} repositories` : "failed"
-									}`
-								: "never"}
-						</dd>
-						{info.run?.error && <dd className="mt-1 text-[12px] text-danger">{info.run.error}</dd>}
-					</div>
-				</dl>
-			)}
+			{info === undefined ? <SkeletonRows /> : <SyncSettings info={info} />}
 			{result && <p className="mt-6 text-[13px] text-cyan">{result}</p>}
 			{error && <p className="mt-6 text-[13px] text-danger">{error}</p>}
 			<h2 className="mt-10 text-[12px] text-fog">Indexed repositories</h2>
-			{docs === undefined ? null : docs.length === 0 ? (
-				<p className="mt-3 text-[13px] text-dim">None yet.</p>
-			) : (
-				<ul className="mt-3 divide-y divide-line border-y border-line">
-					{docs.map((d) => (
-						<li key={d._id} className="flex items-center justify-between gap-4 py-2.5">
-							<span className="truncate text-[13px] text-ice">{d.title.replace(/ \(GitHub\)$/, "")}</span>
-							<StatusBadge status={d.status} chunks={d.chunkCount} error={d.error} />
-						</li>
-					))}
-				</ul>
-			)}
+			<IndexedRepos />
 		</div>
 	);
+}
+
+function SyncSettings({ info }: { info: SyncInfo }) {
+	return (
+		<dl className="grid gap-6 text-[13px] sm:grid-cols-4">
+			<div>
+				<dt className="text-dim">account</dt>
+				<dd className="mt-1 text-ice">{info.username ?? "GITHUB_USERNAME not set"}</dd>
+			</div>
+			<div>
+				<dt className="text-dim">organizations</dt>
+				<dd className="mt-1 text-ice">
+					{info.orgs.length ? info.orgs.join(", ") : "public memberships only (set GITHUB_ORGS)"}
+				</dd>
+			</div>
+			<div>
+				<dt className="text-dim">token</dt>
+				<dd className="mt-1 text-ice">{info.hasToken ? "GITHUB_TOKEN set" : "none (60 requests/hour)"}</dd>
+			</div>
+			<LastSync run={info.run} />
+		</dl>
+	);
+}
+
+function lastSyncText(run: SyncInfo["run"]) {
+	if (!run) return "never";
+	return `${formatTime(run.finishedAt)}, ${run.status === "ok" ? `${run.repoCount} repositories` : "failed"}`;
+}
+
+function LastSync({ run }: { run: SyncInfo["run"] }) {
+	return (
+		<div>
+			<dt className="text-dim">last sync</dt>
+			<dd className={`mt-1 ${run?.status === "error" ? "text-danger" : "text-ice"}`}>{lastSyncText(run)}</dd>
+			{run?.error && <dd className="mt-1 text-[12px] text-danger">{run.error}</dd>}
+		</div>
+	);
+}
+
+function IndexedRepos() {
+	const docs = useQuery(api.knowledge.queries.list, { namespace: "github" });
+	if (docs === undefined) return null;
+	if (docs.length === 0) return <p className="mt-3 text-[13px] text-dim">None yet.</p>;
+	return (
+		<ul className="mt-3 divide-y divide-line border-y border-line">
+			{docs.map((d) => (
+				<li key={d._id} className="flex items-center justify-between gap-4 py-2.5">
+					<span className="truncate text-[13px] text-ice">{d.title.replace(/ \(GitHub\)$/, "")}</span>
+					<StatusBadge status={d.status} chunks={d.chunkCount} error={d.error} />
+				</li>
+			))}
+		</ul>
+	);
+}
+
+function syncSummary(r: { synced: number; removed: number; orgs: string[] }) {
+	const removed = r.removed ? `, removed ${r.removed}` : "";
+	const orgs = r.orgs.length ? ` (organizations scanned: ${r.orgs.join(", ")})` : "";
+	return `Synced ${r.synced} repositories${removed}${orgs}.`;
 }
