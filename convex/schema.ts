@@ -14,6 +14,36 @@ export const vKnowledgeSource = v.union(
 export const vIngestStatus = v.union(v.literal("pending"), v.literal("ready"), v.literal("error"));
 
 export default defineSchema({
+	arcadeRuns: defineTable({
+		ownerId: v.string(),
+		network: v.optional(v.string()),
+		seed: v.number(),
+		layout: v.union(v.literal("wide"), v.literal("tall")),
+		startedAt: v.number(),
+		status: v.union(v.literal("open"), v.literal("verifying"), v.literal("verified"), v.literal("rejected")),
+		inputs: v.optional(v.bytes()),
+		initials: v.optional(v.string()),
+		submittedAt: v.optional(v.number()),
+		score: v.optional(v.number()),
+		level: v.optional(v.number()),
+		ticks: v.optional(v.number()),
+		rank: v.optional(v.number()),
+		total: v.optional(v.number()),
+		personalBest: v.optional(v.boolean()),
+		reason: v.optional(v.string()),
+	})
+		.index("by_owner_status", ["ownerId", "status"])
+		.index("by_status_startedAt", ["status", "startedAt"])
+		.index("by_status_submittedAt", ["status", "submittedAt"]),
+	arcadeScores: defineTable({
+		ownerId: v.string(),
+		initials: v.string(),
+		score: v.number(),
+		level: v.number(),
+		achievedAt: v.number(),
+	})
+		.index("by_owner", ["ownerId"])
+		.index("by_score", ["score"]),
 	analyticsEvents: defineTable(eventFields).index("by_day_kind", ["day", "kind"]),
 	users: defineTable({
 		guestConvertedAt: v.optional(v.number()),

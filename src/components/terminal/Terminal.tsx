@@ -3,7 +3,9 @@
 import { optimisticallySendMessage, type UIMessage } from "@convex-dev/agent/react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useMutation } from "convex/react";
+import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { ARCADE_COMMAND } from "@/components/arcade/config";
 import { SiteNav } from "@/components/SiteNav";
 import { api } from "../../../convex/_generated/api";
 import { BootSequence, type BootLine } from "./BootSequence";
@@ -18,8 +20,12 @@ import { type LocalLine, Transcript } from "./Transcript";
 
 type Session = { tier: Tier; used: number; limit: number; remaining: number };
 
-/** /help and /clear run here, even before a thread is open. */
-const isLocalCommand = (text: string) => text.startsWith("/help") || text.startsWith("/clear");
+/** The arcade: its code loads only when someone runs the command. */
+const Arcade = dynamic(() => import("@/components/arcade/Arcade"), { ssr: false });
+
+/** /help, /clear and the arcade run here, even before a thread is open. */
+const isLocalCommand = (text: string) =>
+	text.startsWith("/help") || text.startsWith("/clear") || text.trim().toLowerCase() === ARCADE_COMMAND;
 
 /** Whether a reply is on its way. */
 function replyState(messages: UIMessage[]) {
@@ -66,6 +72,7 @@ export function Terminal() {
 	const [lines, setLines] = useState<LocalLine[]>([]);
 	const [gateCode, setGateCode] = useState<SendFailure["gate"] | null>(null);
 	const [degauss, setDegauss] = useState(false);
+	const [arcade, setArcade] = useState(false);
 	const lineId = useRef(0);
 	/** Set while a message waits on a guest token, before `replying` can see it. */
 	const sending = useRef(false);
@@ -104,6 +111,11 @@ export function Terminal() {
 			setDegauss(true);
 			return null;
 		}
+		// Runs here: never sent to the AI, costs no message.
+		if (command === ARCADE_COMMAND) {
+			setArcade(true);
+			return null;
+		}
 		if (command?.startsWith("/") && !COMMANDS.some((c) => c.name === command)) {
 			print("error", `Unknown command ${command}. Type /help for the list.`);
 			return null;
@@ -134,6 +146,18 @@ export function Terminal() {
 			}}
 		>
 			{boot.intro && <DustIntro onReveal={boot.reveal} />}
+			{arcade && (
+				<Arcade
+					onExit={(summary) => {
+						setArcade(false);
+						setDegauss(true);
+						if (summary) print("notice", summary);
+						requestAnimationFrame(() =>
+							document.querySelector<HTMLTextAreaElement>(".crt-screen textarea")?.focus({ preventScroll: true }),
+						);
+					}}
+				/>
+			)}
 			<SiteNav status={session ? <SessionStatus tier={tier} session={session} /> : null} />
 
 			<div

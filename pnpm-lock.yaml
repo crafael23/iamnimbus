@@ -17,6 +17,9 @@ importers:
       '@convex-dev/agent':
         specifier: ^0.7.9
         version: 0.7.9(@ai-sdk/provider-utils@5.0.75(zod@4.6.7))(@ai-sdk/provider@4.0.36)(ai@7.0.163(zod@4.6.7))(convex-helpers@0.1.134(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7))(convex@1.49.0(react@19.3.1))(react@19.3.1)
+      '@convex-dev/aggregate':
+        specifier: ^0.3.4
+        version: 0.3.4(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
       '@convex-dev/ai-sdk-provider':
         specifier: ^0.3.0
         version: 0.3.0(ai@7.0.163(zod@4.6.7))(convex@1.49.0(react@19.3.1))
@@ -201,12 +204,23 @@ packages:
       react:
         optional: true
 
+  '@convex-dev/aggregate@0.3.4':
+    resolution: {integrity: sha512-w60E4fLuysza8sBIQsLlYFxnzMB7ed8yqYpu/JfDhkUYvnnvW3CzLEf74zCwb/RfLrR6u5a/0pfvVtIp4XNIoA==}
+    peerDependencies:
+      convex: ^1.43.0
+
   '@convex-dev/ai-sdk-provider@0.3.0':
     resolution: {integrity: sha512-0ENjkOgiCBybI/luPW8d9rszpb01FIXaU88Ff/5nXHRfFAVj0Xc1UW7XMtmq39rPlSPqyOdimJ+66AoFN7pzsw==}
     engines: {node: '>=22'}
     peerDependencies:
       ai: ^7.0.105
       convex: ^1.45.0
+
+  '@convex-dev/batch-worker@0.3.3':
+    resolution: {integrity: sha512-A9mOhSqITtdF6TR9bVZjTy+eES6/r/8ZvMWnNdKsATg8EOn5JMzDplibjaHCjQ57FjVeizbuKJ8GlnMs1RWF0g==}
+    peerDependencies:
+      convex: ^1.43.0
+      react: ^18.3.1 || ^19.0.0
 
   '@convex-dev/batch-worker@0.3.5':
     resolution: {integrity: sha512-kTxLGy1TXRN6WLcENcoRWWnvPshv1sIZp2EpPqGqCB4FxDI7m8tEHUr+jCLdhGtSZT1UHkWtb1w8YYuEzTxHWQ==}
@@ -1529,6 +1543,28 @@ packages:
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
 
+  convex-helpers@0.1.128:
+    resolution: {integrity: sha512-5n7uKsJrYnnybvuSAWgDQ9d5Avqk4CzFsJ22SXow4tHmVxSUH6qiJCeomWWxcLSfN9t9jpKIXNJiGJrjddS4ng==}
+    hasBin: true
+    peerDependencies:
+      '@standard-schema/spec': ^1.0.0
+      convex: ^1.46.0
+      hono: ^4.0.5
+      react: ^17.0.2 || ^18.0.0 || ^19.0.0
+      typescript: ^5.5 || ^6.0.0 || ^7.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@standard-schema/spec':
+        optional: true
+      hono:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+      zod:
+        optional: true
+
   convex-helpers@0.1.134:
     resolution: {integrity: sha512-GPVj5HmRMOyd2PF/OxUYQlNS/HdmOo3pZ4iTyPXyEOxuXwvNeQcx7OUlvNFTTYnHhcuonsMx8UuqjVo5gCqpZA==}
     hasBin: true
@@ -2589,6 +2625,19 @@ snapshots:
       '@ungap/structured-clone': 1.4.0
       react: 19.3.1
 
+  '@convex-dev/aggregate@0.3.4(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)':
+    dependencies:
+      '@convex-dev/batch-worker': 0.3.3(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
+      convex: 1.49.0(react@19.3.1)
+      convex-helpers: 0.1.128(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
+    transitivePeerDependencies:
+      - '@standard-schema/spec'
+      - hono
+      - prettier
+      - react
+      - typescript
+      - zod
+
   '@convex-dev/ai-sdk-provider@0.3.0(ai@7.0.163(zod@4.6.7))(convex@1.49.0(react@19.3.1))':
     dependencies:
       '@ai-sdk/anthropic': 4.0.40(zod@4.6.7)
@@ -2597,6 +2646,18 @@ snapshots:
       ai: 7.0.163(zod@4.6.7)
       convex: 1.49.0(react@19.3.1)
       zod: 4.6.7
+
+  '@convex-dev/batch-worker@0.3.3(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)':
+    dependencies:
+      convex: 1.49.0(react@19.3.1)
+      convex-helpers: 0.1.134(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
+      react: 19.3.1
+    transitivePeerDependencies:
+      - '@standard-schema/spec'
+      - hono
+      - prettier
+      - typescript
+      - zod
 
   '@convex-dev/batch-worker@0.3.5(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)':
     dependencies:
@@ -3550,6 +3611,15 @@ snapshots:
   client-only@0.0.1: {}
 
   comma-separated-tokens@2.0.3: {}
+
+  convex-helpers@0.1.128(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(react@19.3.1)(typescript@7.0.2)(zod@4.6.7):
+    dependencies:
+      convex: 1.49.0(react@19.3.1)
+    optionalDependencies:
+      '@standard-schema/spec': 1.1.0
+      react: 19.3.1
+      typescript: 7.0.2
+      zod: 4.6.7
 
   convex-helpers@0.1.134(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.1))(prettier@3.8.1)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7):
     dependencies:

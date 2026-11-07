@@ -1,4 +1,5 @@
 import agent from "@convex-dev/agent/test";
+import aggregate from "@convex-dev/aggregate/test";
 import rag from "@convex-dev/rag/test";
 import rateLimiter from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
@@ -15,6 +16,7 @@ export function setup() {
 	agent.register(t, "agent");
 	rag.register(t, "rag");
 	rateLimiter.register(t, "rateLimiter");
+	aggregate.register(t, "arcadeScores");
 	return t;
 }
 

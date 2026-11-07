@@ -1,3 +1,5 @@
+import { ARCADE_COMMAND } from "@/components/arcade/config";
+
 export type CommandSpec = {
 	name: string;
 	hint: string;
@@ -13,6 +15,8 @@ export const COMMANDS: CommandSpec[] = [
 	{ name: "/contact", hint: "how to reach out" },
 	{ name: "/help", hint: "list commands", local: true },
 	{ name: "/clear", hint: "clear the screen", local: true },
+	// The arcade: listed so it can be found, but not explained.
+	{ name: ARCADE_COMMAND, hint: "???", local: true },
 ];
 
 export function matchCommands(input: string): CommandSpec[] {
