@@ -9,6 +9,10 @@
  */
 
 import type * as _lib_analytics from "../_lib/analytics.js";
+import type * as _lib_arcade_bots from "../_lib/arcade/bots.js";
+import type * as _lib_arcade_engine from "../_lib/arcade/engine.js";
+import type * as _lib_arcade_initials from "../_lib/arcade/initials.js";
+import type * as _lib_arcade_leaderboard from "../_lib/arcade/leaderboard.js";
 import type * as _lib_asOf from "../_lib/asOf.js";
 import type * as _lib_auth from "../_lib/auth.js";
 import type * as _lib_billing from "../_lib/billing.js";
@@ -26,6 +30,9 @@ import type * as _lib_slug from "../_lib/slug.js";
 import type * as analytics_internal from "../analytics/internal.js";
 import type * as analytics_mutations from "../analytics/mutations.js";
 import type * as analytics_queries from "../analytics/queries.js";
+import type * as arcade_internal from "../arcade/internal.js";
+import type * as arcade_mutations from "../arcade/mutations.js";
+import type * as arcade_queries from "../arcade/queries.js";
 import type * as auth from "../auth.js";
 import type * as authInternal from "../authInternal.js";
 import type * as billing_internal from "../billing/internal.js";
@@ -60,6 +67,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "_lib/analytics": typeof _lib_analytics;
+  "_lib/arcade/bots": typeof _lib_arcade_bots;
+  "_lib/arcade/engine": typeof _lib_arcade_engine;
+  "_lib/arcade/initials": typeof _lib_arcade_initials;
+  "_lib/arcade/leaderboard": typeof _lib_arcade_leaderboard;
   "_lib/asOf": typeof _lib_asOf;
   "_lib/auth": typeof _lib_auth;
   "_lib/billing": typeof _lib_billing;
@@ -77,6 +88,9 @@ declare const fullApi: ApiFromModules<{
   "analytics/internal": typeof analytics_internal;
   "analytics/mutations": typeof analytics_mutations;
   "analytics/queries": typeof analytics_queries;
+  "arcade/internal": typeof arcade_internal;
+  "arcade/mutations": typeof arcade_mutations;
+  "arcade/queries": typeof arcade_queries;
   auth: typeof auth;
   authInternal: typeof authInternal;
   "billing/internal": typeof billing_internal;
@@ -135,4 +149,5 @@ export declare const components: {
   agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
   rag: import("@convex-dev/rag/_generated/component.js").ComponentApi<"rag">;
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  arcadeScores: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"arcadeScores">;
 };

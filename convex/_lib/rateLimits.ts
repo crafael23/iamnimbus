@@ -27,6 +27,18 @@ export const GUEST_NETWORK_DAILY_LIMIT = 30;
  * - threadCreate: caps thread creation per owner.
  */
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
+	arcadeRuns: {
+		kind: "token bucket",
+		rate: 60,
+		period: HOUR,
+		capacity: 20,
+	},
+	arcadeRunsNetwork: {
+		kind: "token bucket",
+		rate: 200,
+		period: HOUR,
+		capacity: 60,
+	},
 	guestMessages: {
 		kind: "token bucket",
 		rate: GUEST_MESSAGE_LIMIT,

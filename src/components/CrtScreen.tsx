@@ -2,9 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-
-/** Barrel strength: a corner moves inward by CURVE / 4 of the screen's size. */
-const CURVE = 0.1;
+import { CRT_CURVE as CURVE, CURVE_QUERY, isWebkit } from "./crtCurve";
 
 type Curve = { url: string; scale: number; width: number; height: number };
 
@@ -70,10 +68,8 @@ export function CrtScreen({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		const el = screen.current;
 		if (!el) return;
-		const ua = navigator.userAgent;
-		const webkit = /iP(hone|ad|od)/.test(ua) || (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua));
-		if (webkit) return;
-		const wide = window.matchMedia("(min-width: 768px) and (pointer: fine)");
+		if (isWebkit()) return;
+		const wide = window.matchMedia(CURVE_QUERY);
 		const raf = { id: 0 };
 		const update = () => {
 			cancelAnimationFrame(raf.id);

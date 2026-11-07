@@ -429,6 +429,32 @@
 	opacity: 0.55;
 }
 
+/*
+ * The arcade (src/components/arcade): a WebGL canvas the shape of the
+ * screen, under the glass so the scanlines and falloff stay in front. While
+ * it runs the terminal is hidden, so the curved screen has nothing to
+ * repaint and the SVG filter costs nothing.
+ */
+.arcade-layer {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	overflow: hidden;
+	border-radius: 20px;
+	background: var(--color-void);
+	touch-action: none;
+	-webkit-tap-highlight-color: transparent;
+}
+@media (min-width: 768px) {
+	.arcade-layer {
+		inset: 12px;
+		border-radius: 38px / 34px;
+	}
+}
+:root[data-arcade] .crt-screen {
+	visibility: hidden;
+}
+
 /* A burst of static when the dormant screen wakes (DustIntro). */
 .crt-static {
 	position: fixed;
