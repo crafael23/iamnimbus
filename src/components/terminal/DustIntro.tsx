@@ -22,15 +22,14 @@ import {
  * It plays by itself. Any key, or the skip button, goes straight to the
  * terminal.
  *
- * The glass is built the way dust on a screen actually looks, in layers over
- * the curved image: a haze that softens the picture wherever dust remains, a
- * film that blocks the tube's light (dark specks over bright title bars), a
- * film that catches the room's light (pale specks over the dark tube), the
- * motes a wipe knocks loose, and a faint reflection on the glass itself. The
- * dust and the reflection drift a few pixels against the image while the
- * camera settles, which is what places them on the glass. Every layer is
- * still or finite: canvases repaint only while being wiped, and the motes
- * stop when the last one lands.
+ * The glass is built the way a dusty screen looks on film. The dust is a
+ * dense, matte film. The screen's light scatters through it, so under dust
+ * the windows are soft patches of glow (a blurred copy of them, masked by the
+ * dust itself) and only clean glass shows them sharp. Fingers leave dark,
+ * dry-brushed strokes that taper where each finger lands and lifts, with dust
+ * left between them, and the faint smears they leave stay on the glass after
+ * the dust is gone. Nothing animates forever: the canvases repaint only while
+ * the hand moves.
  */
 
 type Stage = "dust" | "lit" | "clean" | "typing" | "answered" | "maximize" | "fade";
@@ -38,48 +37,33 @@ const ORDER: Stage[] = ["dust", "lit", "clean", "typing", "answered", "maximize"
 const reached = (stage: Stage, step: Stage) => ORDER.indexOf(stage) >= ORDER.indexOf(step);
 
 type Pt = { x: number; y: number };
-/** A line of a finger's print: fingers leave streaks, not clean bands. */
-type Streak = { offset: number; width: number; strength: number };
-/** One band of the wiping hand: where it sits across the hand, how wide, how hard it presses. */
-type Finger = { offset: number; width: number; strength: number; streaks: Streak[] };
-/** The dust a hand pushes aside piles up in a line along each of its edges. */
-type Ridge = { offset: number; width: number };
-type Hand = { fingers: Finger[]; ridges: Ridge[] };
-type Mote = {
-	x: number;
-	y: number;
-	vx: number;
-	vy: number;
-	age: number;
-	life: number;
-	size: number;
-	alpha: number;
-	/** Out of focus: in front of the glass, nearer the camera. */
-	bokeh: boolean;
-};
+/** One line of a finger's print: where it sits across the finger (-1..1) and how wide it is. */
+type Bristle = { offset: number; width: number; seed: number };
+/**
+ * A finger: where it sits across the hand (in hand widths), how wide it is,
+ * and when it presses on the glass (t0 to t1 of the sweep). Its contact
+ * narrows from the edges as it lands and lifts, which tapers its stroke.
+ */
+type Finger = { offset: number; width: number; t0: number; t1: number; wave: number; bristles: Bristle[] };
 type Glass = {
-	/** Dust catching the room's light. Also the one measured for coverage. */
-	scatter: CanvasRenderingContext2D;
-	/** Dust blocking the tube's light. */
-	occlude: CanvasRenderingContext2D;
-	/** Each layer as it was when the current sweep began. */
-	base: { scatter: CanvasRenderingContext2D; occlude: CanvasRenderingContext2D } | null;
+	film: CanvasRenderingContext2D;
+	residue: CanvasRenderingContext2D | null;
 	probe: CanvasRenderingContext2D | null;
 	mask: CanvasRenderingContext2D | null;
-	veil: HTMLDivElement | null;
-	motes: CanvasRenderingContext2D | null;
-	sprite: HTMLCanvasElement;
+	/** The sharp screen, shown only where the glass is clean. */
+	sharp: HTMLDivElement | null;
+	/** The blurred screen, shown only where dust is left. */
+	haze: HTMLDivElement | null;
+	/** Set once the glass is clean: masks are no longer updated. */
+	done: boolean;
 	width: number;
 	height: number;
 	hand: number;
 	/** Total dust alpha when fresh, for measuring how much has been wiped. */
 	initial: number;
 	measuredAt: number;
-	live: Mote[];
-	moteRaf: number;
-	moteAt: number;
-	/** Reduced motion: no floating motes. */
-	calm: boolean;
+	maskBusy: boolean;
+	maskUrls: string[];
 };
 
 /** Share of the dust wiped before the screen wakes. */
@@ -87,24 +71,23 @@ const WAKE_AT = 0.12;
 /** How long the dusty clock sits before the hand arrives. */
 const DORMANT_MS = 1500;
 /** Each sweep of the hand, and the pause while it lifts for the next. */
-const SWEEP_MS = 600;
-const LIFT_MS = 140;
+const SWEEP_MS = 620;
+const LIFT_MS = 150;
 /** Where each sweep crosses the glass, top to bottom: through the clock first. */
-const SWEEPS = [0.52, 0.26, 0.8, 0.03];
+const SWEEPS = [0.52, 0.27, 0.8, 0.05];
 const COMMAND = "whoami";
 const PROBE_W = 48;
 const PROBE_H = 27;
-/** The haze mask: coarse on purpose, it is blurred by scaling. */
-const MASK_W = 160;
-const MASK_H = 90;
-const MAX_MOTES = 380;
+/**
+ * Pixels in the dust masks: fine enough to follow a finger, coarse enough to
+ * encode fast. Shaped like the screen, so portrait phones get the same detail.
+ */
+const MASK_AREA = 384 * 216;
 /** When the machine was first switched on: the first commit. */
 const SINCE = Date.UTC(2026, 2, 11);
 
-/** Dust colours: lit film and specks, and the shadow they cast on the tube's light. */
-const LIT = "214, 204, 186";
-const FILM = [150, 140, 125] as const;
-const SHADE = [24, 22, 19] as const;
+/** Settled dust under a dim room light: a warm khaki. */
+const DUST = [104, 92, 66] as const;
 
 const two = (n: number) => String(n).padStart(2, "0");
 const clockStamp = (d: Date) =>
@@ -114,28 +97,46 @@ const clockStamp = (d: Date) =>
 const timeOfDay = (d: Date) => `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+/** A stable 0..1 hash, so a bristle frays the same way on every frame. */
+const hash = (x: number) => {
+	const s = Math.sin(x * 12.9898) * 43758.5453;
+	return s - Math.floor(s);
+};
 
-function makeHand(): Hand {
+/**
+ * Four or five fingers, spread with gaps between them. The outer fingers
+ * land a little later and lift a little earlier.
+ */
+function makeHand(): Finger[] {
 	const r = Math.random;
-	const n = 5 + Math.floor(r() * 3);
-	const fingers = Array.from({ length: n }, (_, i) => ({
-		offset: (i / (n - 1) - 0.5) * 0.86 + (r() - 0.5) * 0.06,
-		width: 0.07 + r() * 0.1,
-		strength: 0.78 + r() * 0.2,
-		streaks: Array.from({ length: 2 }, () => ({
-			offset: (r() - 0.5) * 0.6,
-			width: 0.3 + r() * 0.3,
-			strength: 0.6 + r() * 0.35,
-		})),
-	}));
-	// The palm: one broad, light pass under the fingers.
-	const palm = { offset: 0, width: 0.9, strength: 0.45, streaks: [] };
-	const ridges = [-1, 1].map((side) => ({
-		offset: side * (0.47 + (r() - 0.5) * 0.03),
-		width: 0.03 * (0.7 + r() * 0.6),
-	}));
-	return { fingers: [palm, ...fingers], ridges };
+	const n = r() < 0.5 ? 4 : 5;
+	return Array.from({ length: n }, (_, i) => {
+		const offset = (i / (n - 1) - 0.5) * 0.8 + (r() - 0.5) * 0.05;
+		const edge = Math.abs(offset) * 2;
+		return {
+			offset,
+			width: 0.13 + r() * 0.06,
+			t0: 0.02 + r() * 0.08 + edge * 0.1,
+			t1: 0.8 + r() * 0.16 - edge * 0.12,
+			wave: r() * Math.PI * 2,
+			bristles: Array.from({ length: 26 }, () => ({
+				offset: (r() * 2 - 1) * (0.8 + r() * 0.2),
+				width: 0.05 + r() * 0.09,
+				seed: r() * 1000,
+			})),
+		};
+	});
 }
+
+/** Smooth 1D noise in 0..1. */
+function vnoise(x: number) {
+	const i = Math.floor(x);
+	return hash(i) + (hash(i + 1) - hash(i)) * smooth(x - i);
+}
+
+/** How hard a finger presses at this point of the sweep, 0..1. */
+const pressure = (f: Finger, u: number) =>
+	smooth(clamp01((u - f.t0) / 0.12)) * smooth(clamp01((f.t1 - u) / 0.22));
 
 function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
 	const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -175,212 +176,181 @@ function noiseField(w: number, h: number) {
 	return out;
 }
 
+/** Fine grain at device pixels: a random tile, too fine to show its repeat. */
+function grainTile(ctx: CanvasRenderingContext2D) {
+	const size = 256;
+	const c = document.createElement("canvas");
+	c.width = size;
+	c.height = size;
+	const g = c.getContext("2d");
+	if (!g) return null;
+	const img = g.createImageData(size, size);
+	for (let k = 0; k < img.data.length; k += 4) {
+		const v = Math.random();
+		const light = v > 0.5;
+		img.data[k] = img.data[k + 1] = img.data[k + 2] = light ? 255 : 0;
+		img.data[k + 3] = Math.abs(v - 0.5) * 2 * (light ? 34 : 46);
+	}
+	g.putImageData(img, 0, 0);
+	return ctx.createPattern(c, "repeat");
+}
+
 /**
- * Years of settled dust, painted twice from one field: the light it catches
- * and the light it blocks. Thicker toward the bezel, lit by a lamp low on the
- * right, with specks of every size, a few fibres and the ghost of an old wipe.
+ * Years of settled dust: a dense matte film, a little uneven and thicker
+ * toward the bezel, lit from the room on the right, with fine grain, grime,
+ * the odd hair, and the ghost of a wipe from long ago.
  */
-function paintDust(scatter: CanvasRenderingContext2D, occlude: CanvasRenderingContext2D, w: number, h: number) {
+function paintFilm(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number) {
 	const r = Math.random;
 	const big = Math.max(w, h);
-	const fw = 200;
+	const fw = 160;
 	const fh = Math.max(2, Math.round((fw * h) / w));
 	const field = noiseField(fw, fh);
-	const density = new Float32Array(fw * fh);
-	const lit = new ImageData(fw, fh);
-	const shade = new ImageData(fw, fh);
+	const img = new ImageData(fw, fh);
 	for (let y = 0; y < fh; y++) {
 		for (let x = 0; x < fw; x++) {
 			const i = y * fw + x;
 			const edge = Math.max(Math.abs((x + 0.5) / fw - 0.5), Math.abs((y + 0.5) / fh - 0.5)) * 2;
-			const d = clamp01(0.58 + (field[i] - 0.5) * 1.9 + 0.42 * smooth(clamp01((edge - 0.68) / 0.32)));
-			density[i] = d;
+			const d = clamp01(0.86 + (field[i] - 0.5) * 0.4 + 0.1 * smooth(clamp01((edge - 0.7) / 0.3)));
 			const k = i * 4;
-			lit.data[k] = FILM[0];
-			lit.data[k + 1] = FILM[1];
-			lit.data[k + 2] = FILM[2];
-			lit.data[k + 3] = d * 0.62 * 255;
-			shade.data[k] = SHADE[0];
-			shade.data[k + 1] = SHADE[1];
-			shade.data[k + 2] = SHADE[2];
-			shade.data[k + 3] = d * 0.5 * 255;
+			// Thicker dust is a touch lighter: it scatters more of the room's light.
+			const lift = 0.9 + 0.2 * field[i];
+			img.data[k] = DUST[0] * lift;
+			img.data[k + 1] = DUST[1] * lift;
+			img.data[k + 2] = DUST[2] * lift;
+			img.data[k + 3] = d * 255;
 		}
 	}
 	const small = document.createElement("canvas");
 	small.width = fw;
 	small.height = fh;
-	const sctx = small.getContext("2d");
-	for (const [ctx, img] of [
-		[scatter, lit],
-		[occlude, shade],
-	] as const) {
-		if (!sctx) break;
-		sctx.putImageData(img, 0, 0);
-		ctx.imageSmoothingEnabled = true;
-		ctx.imageSmoothingQuality = "high";
-		ctx.drawImage(small, 0, 0, w, h);
+	small.getContext("2d")?.putImageData(img, 0, 0);
+	ctx.imageSmoothingEnabled = true;
+	ctx.imageSmoothingQuality = "high";
+	ctx.drawImage(small, 0, 0, w, h);
+
+	// Light falls on the dust from the room, low on the right; the far corner is dim.
+	ctx.globalCompositeOperation = "source-atop";
+	glow(ctx, w * 0.86, h * 1.05, big * 0.85, "rgba(214, 182, 128, 0.32)");
+	glow(ctx, w * 0.05, h * -0.05, big * 0.7, "rgba(0, 0, 0, 0.32)");
+	// Grime: soft, uneven patches.
+	for (let i = 0; i < 26; i++) {
+		glow(
+			ctx,
+			r() * w,
+			r() * h,
+			(0.03 + r() * 0.12) * big,
+			r() < 0.6 ? `rgba(20, 16, 10, ${0.06 + r() * 0.1})` : `rgba(190, 170, 130, ${0.04 + r() * 0.06})`,
+		);
 	}
-
-	// The lamp warms the dust it reaches, and only the dust.
-	scatter.globalCompositeOperation = "source-atop";
-	glow(scatter, w * 0.8, h * 1.04, big * 0.8, "rgba(196, 150, 96, 0.42)");
-	glow(scatter, w * 0.1, h * 0.02, big * 0.55, "rgba(150, 160, 172, 0.2)");
-	scatter.globalCompositeOperation = "source-over";
-
-	// Someone wiped it once, long ago.
-	for (const ctx of [scatter, occlude]) {
-		ctx.globalCompositeOperation = "destination-out";
-		ctx.lineCap = "round";
-		for (let i = 0; i < 2; i++) {
-			const y = (0.2 + r() * 0.6) * h;
-			ctx.strokeStyle = "rgba(0,0,0,0.16)";
-			ctx.lineWidth = big * (0.08 + r() * 0.06);
-			ctx.beginPath();
-			ctx.moveTo(-0.1 * w, y);
-			ctx.quadraticCurveTo(w * (0.3 + r() * 0.4), y - h * (0.1 + r() * 0.15), w * 1.1, y + h * (r() - 0.5) * 0.2);
-			ctx.stroke();
-		}
-		ctx.globalCompositeOperation = "source-over";
+	// Grain at device pixels.
+	const grain = grainTile(ctx);
+	if (grain) {
+		ctx.save();
+		ctx.scale(1 / dpr, 1 / dpr);
+		ctx.fillStyle = grain;
+		ctx.fillRect(0, 0, w * dpr, h * dpr);
+		ctx.restore();
 	}
+	ctx.globalCompositeOperation = "source-over";
 
-	// Specks: many tiny, a few large clumps, gathered where the film is thick
-	// and brightest where the light falls.
-	const light = (x: number, y: number) => {
-		const lamp = Math.hypot(x - w * 0.8, y - h * 1.04) / (big * 0.6);
-		const spill = Math.hypot(x - w * 0.1, y) / (big * 0.4);
-		return 0.4 + 0.6 * Math.exp(-lamp * lamp) + 0.25 * Math.exp(-spill * spill);
-	};
-	const dot = (ctx: CanvasRenderingContext2D, x: number, y: number, s: number) => {
-		if (s < 0.8) {
-			ctx.fillRect(x, y, s * 1.6, s * 1.6);
-		} else {
-			ctx.beginPath();
-			ctx.arc(x, y, s, 0, Math.PI * 2);
-			ctx.fill();
-		}
-	};
-	const tries = Math.round((w * h) / 520);
-	for (let i = 0; i < tries; i++) {
+	// Hairs and the few grains large enough to see.
+	ctx.lineCap = "round";
+	for (let i = 0; i < 9; i++) {
 		const x = r() * w;
 		const y = r() * h;
-		const d = density[Math.min(fh - 1, Math.floor((y / h) * fh)) * fw + Math.min(fw - 1, Math.floor((x / w) * fw))];
-		if (r() > 0.25 + 0.75 * d) continue;
-		const size = 0.35 + 2.6 * r() ** 4;
-		scatter.fillStyle = `rgba(${LIT}, ${clamp01((0.2 + r() * 0.45) * light(x, y))})`;
-		occlude.fillStyle = `rgba(16, 14, 12, ${0.4 + r() * 0.4})`;
-		const bits = size > 1.7 ? 3 : 1;
-		for (let b = 0; b < bits; b++) {
-			const bx = x + (b ? (r() - 0.5) * size * 2.4 : 0);
-			const by = y + (b ? (r() - 0.5) * size * 2.4 : 0);
-			const bs = b ? size * (0.4 + r() * 0.4) : size;
-			dot(scatter, bx, by, bs);
-			dot(occlude, bx, by, bs * 0.9);
-		}
-	}
-
-	// Fibres and hairs.
-	for (const ctx of [scatter, occlude]) ctx.lineCap = "round";
-	for (let i = 0; i < 14; i++) {
-		const x = r() * w;
-		const y = r() * h;
-		const len = 14 + r() * 90;
+		const len = 20 + r() * 80;
 		const a = r() * Math.PI * 2;
-		const bend = (r() - 0.5) * 1.6;
-		const width = 0.5 + r() * 0.7;
-		for (const [ctx, color] of [
-			[scatter, `rgba(${LIT}, ${(0.12 + r() * 0.16) * light(x, y)})`],
-			[occlude, "rgba(16, 14, 12, 0.32)"],
-		] as const) {
-			ctx.strokeStyle = color;
-			ctx.lineWidth = width;
-			ctx.beginPath();
-			ctx.moveTo(x, y);
-			ctx.quadraticCurveTo(
-				x + Math.cos(a + bend) * len * 0.6,
-				y + Math.sin(a + bend) * len * 0.6,
-				x + Math.cos(a) * len,
-				y + Math.sin(a) * len,
-			);
-			ctx.stroke();
-		}
+		const bend = (r() - 0.5) * 1.8;
+		ctx.strokeStyle = `rgba(36, 30, 22, ${0.35 + r() * 0.3})`;
+		ctx.lineWidth = 0.5 + r() * 0.5;
+		ctx.beginPath();
+		ctx.moveTo(x, y);
+		ctx.quadraticCurveTo(
+			x + Math.cos(a + bend) * len * 0.6,
+			y + Math.sin(a + bend) * len * 0.6,
+			x + Math.cos(a) * len,
+			y + Math.sin(a) * len,
+		);
+		ctx.stroke();
 	}
+	for (let i = 0; i < Math.round((w * h) / 9000); i++) {
+		ctx.fillStyle = r() < 0.7 ? `rgba(40, 33, 24, ${0.3 + r() * 0.4})` : `rgba(200, 186, 156, ${0.2 + r() * 0.3})`;
+		const s = 0.6 + r() * r() * 1.6;
+		ctx.fillRect(r() * w, r() * h, s, s);
+	}
+
+	// Someone wiped it once, long ago: a lighter arc where the dust is thinner.
+	ctx.globalCompositeOperation = "destination-out";
+	for (let i = 0; i < 2; i++) {
+		const y = (0.25 + r() * 0.55) * h;
+		ctx.strokeStyle = "rgba(0,0,0,0.09)";
+		ctx.lineWidth = big * (0.05 + r() * 0.05);
+		ctx.beginPath();
+		ctx.moveTo(-0.1 * w, y);
+		ctx.quadraticCurveTo(w * (0.3 + r() * 0.4), y - h * (0.12 + r() * 0.12), w * 1.1, y + h * (r() - 0.5) * 0.2);
+		ctx.stroke();
+	}
+	ctx.globalCompositeOperation = "source-over";
 }
 
 function dustLeft(glass: Glass) {
 	const p = glass.probe;
 	if (!p) return 0;
 	p.clearRect(0, 0, PROBE_W, PROBE_H);
-	p.drawImage(glass.scatter.canvas, 0, 0, PROBE_W, PROBE_H);
+	p.drawImage(glass.film.canvas, 0, 0, PROBE_W, PROBE_H);
 	const data = p.getImageData(0, 0, PROBE_W, PROBE_H).data;
 	let sum = 0;
 	for (let k = 3; k < data.length; k += 4) sum += data[k];
 	return sum;
 }
 
-/** The haze follows the dust: blur the image only where dust is left. */
+const toUrl = (canvas: HTMLCanvasElement) =>
+	new Promise<string | null>((resolve) =>
+		canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null)),
+	);
+
+function setMask(el: HTMLElement, url: string) {
+	el.style.setProperty("mask-image", `url(${url})`);
+	el.style.setProperty("-webkit-mask-image", `url(${url})`);
+}
+
+/**
+ * Under dust the screen is seen only as scattered light; through clean glass
+ * it is sharp. Two masks from the film's alpha (saturated, so any dust counts
+ * in full) split the screen between a blurred copy and the sharp original.
+ * Encoding is asynchronous and one at a time, so a slow encode never stacks.
+ * (A masked backdrop-filter would be simpler, but Chrome ignores the mask.)
+ */
 function updateHaze(glass: Glass) {
-	const { mask, veil } = glass;
-	if (!mask || !veil) return;
+	const { mask, haze, sharp } = glass;
+	if (!mask || !haze || !sharp || glass.maskBusy || glass.done) return;
+	const dust = mask.canvas;
+	const { width: mw, height: mh } = dust;
 	mask.globalCompositeOperation = "copy";
-	mask.drawImage(glass.scatter.canvas, 0, 0, MASK_W, MASK_H);
-	// Twice the film's alpha: a thin film already softens the picture.
+	mask.drawImage(glass.film.canvas, 0, 0, mw, mh);
 	mask.globalCompositeOperation = "lighter";
-	mask.drawImage(glass.scatter.canvas, 0, 0, MASK_W, MASK_H);
-	const url = `url(${mask.canvas.toDataURL()})`;
-	veil.style.setProperty("mask-image", url);
-	veil.style.setProperty("-webkit-mask-image", url);
-}
-
-function stepMotes(g: Glass, t: number) {
-	const ctx = g.motes;
-	if (!ctx) return;
-	const dt = Math.min(0.05, Math.max(0, t - g.moteAt) / 1000);
-	g.moteAt = t;
-	const drag = Math.exp(-2.6 * dt);
-	ctx.clearRect(0, 0, g.width, g.height);
-	g.live = g.live.filter((m) => (m.age += dt) < m.life);
-	ctx.fillStyle = `rgb(${LIT})`;
-	for (const m of g.live) {
-		m.vx *= drag;
-		m.vy = m.vy * drag + 46 * dt;
-		m.x += m.vx * dt;
-		m.y += m.vy * dt;
-		const k = m.age / m.life;
-		ctx.globalAlpha = m.alpha * Math.min(1, k * 6) * (1 - k);
-		if (m.bokeh) ctx.drawImage(g.sprite, m.x - m.size, m.y - m.size, m.size * 2, m.size * 2);
-		else ctx.fillRect(m.x, m.y, m.size, m.size);
-	}
-	ctx.globalAlpha = 1;
-	g.moteRaf = g.live.length ? requestAnimationFrame((next) => stepMotes(g, next)) : 0;
-}
-
-/** Dust the hand knocks off the glass: a short drift, then it settles out of view. */
-function shedMotes(g: Glass, a: Pt, b: Pt, nx: number, ny: number, hand: number) {
-	if (g.calm || !g.motes || g.live.length >= MAX_MOTES) return;
-	const r = Math.random;
-	const dx = b.x - a.x;
-	const dy = b.y - a.y;
-	const n = 3 + Math.floor(r() * 4);
-	for (let i = 0; i < n; i++) {
-		const t = r();
-		const across = (r() - 0.5) * 0.95 * hand;
-		const bokeh = r() < 0.07;
-		g.live.push({
-			x: a.x + dx * t + nx * across,
-			y: a.y + dy * t + ny * across,
-			vx: dx * (2 + r() * 5) + (r() - 0.5) * 40,
-			vy: dy * (2 + r() * 5) - (10 + r() * 50),
-			age: 0,
-			life: 0.8 + r() * 1.4,
-			size: bokeh ? 2 + r() * 4 : 0.5 + r() * 1.1,
-			alpha: bokeh ? 0.05 + r() * 0.08 : 0.25 + r() * 0.5,
-			bokeh,
-		});
-	}
-	if (!g.moteRaf) {
-		g.moteAt = performance.now();
-		g.moteRaf = requestAnimationFrame((next) => stepMotes(g, next));
-	}
+	mask.drawImage(dust, 0, 0);
+	const clean = document.createElement("canvas");
+	clean.width = mw;
+	clean.height = mh;
+	const cctx = clean.getContext("2d");
+	if (!cctx) return;
+	cctx.fillStyle = "#000";
+	cctx.fillRect(0, 0, mw, mh);
+	cctx.globalCompositeOperation = "destination-out";
+	cctx.drawImage(dust, 0, 0);
+	glass.maskBusy = true;
+	void Promise.all([toUrl(dust), toUrl(clean)]).then(([dustUrl, cleanUrl]) => {
+		glass.maskBusy = false;
+		if (!dustUrl || !cleanUrl || glass.done) return;
+		setMask(haze, dustUrl);
+		setMask(sharp, cleanUrl);
+		const old = glass.maskUrls;
+		// Let the new masks decode before the old ones go.
+		window.setTimeout(() => old.forEach((u) => URL.revokeObjectURL(u)), 500);
+		glass.maskUrls = [dustUrl, cleanUrl];
+	});
 }
 
 function sizeCanvas(el: HTMLCanvasElement, w: number, h: number, dpr: number) {
@@ -389,15 +359,6 @@ function sizeCanvas(el: HTMLCanvasElement, w: number, h: number, dpr: number) {
 	const ctx = el.getContext("2d");
 	ctx?.scale(dpr, dpr);
 	return ctx;
-}
-
-function bokehSprite() {
-	const c = document.createElement("canvas");
-	c.width = 32;
-	c.height = 32;
-	const ctx = c.getContext("2d");
-	if (ctx) glow(ctx, 16, 16, 16, `rgba(${LIT}, 1)`);
-	return c;
 }
 
 export function DustIntro({ onReveal }: { onReveal: () => void }) {
@@ -411,10 +372,10 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 	const [landing, setLanding] = useState<CSSProperties | null>(null);
 
 	const root = useRef<HTMLDivElement>(null);
-	const scatterEl = useRef<HTMLCanvasElement>(null);
-	const occludeEl = useRef<HTMLCanvasElement>(null);
-	const motesEl = useRef<HTMLCanvasElement>(null);
-	const veilEl = useRef<HTMLDivElement>(null);
+	const filmEl = useRef<HTMLCanvasElement>(null);
+	const residueEl = useRef<HTMLCanvasElement>(null);
+	const hazeEl = useRef<HTMLDivElement>(null);
+	const sharpEl = useRef<HTMLDivElement>(null);
 	const glass = useRef<Glass | null>(null);
 	const raf = useRef(0);
 	const revealed = useRef(false);
@@ -444,61 +405,94 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 	}, [advance]);
 
 	/**
-	 * The current sweep so far, drawn over the glass as it was when the sweep
-	 * began. One continuous stroke per line of the hand: drawing a sweep frame
-	 * by frame would double up at every joint and leave seams. Each finger
-	 * clears streaks, not a clean band; the palm thins the dust between; what
-	 * is pushed aside piles up along both edges of the hand.
+	 * Move the hand from a to b, `u0`→`u1` of the way through its sweep, in
+	 * steps of a few pixels. A line of a finger is on the glass while it lies
+	 * inside the finger's contact, which narrows with pressure, so strokes
+	 * taper to a point. Lines near the edge of the contact skip in long runs,
+	 * which frays the edges like a dry brush. Every line on the glass clears
+	 * it fully: the strokes are near black. A few leave a faint smear.
 	 */
 	const wipe = useCallback(
-		(pts: Pt[], hand: Hand, scale = 1) => {
+		(a: Pt, b: Pt, u0: number, u1: number, fingers: Finger[], scale: number, from: Pt | null) => {
 			const g = glass.current;
-			if (!g?.base || pts.length < 2) return;
-			const size = g.hand * scale;
-			const normals = pts.map((_, i) => {
-				const a = pts[Math.max(0, i - 1)];
-				const b = pts[Math.min(pts.length - 1, i + 1)];
-				const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-				return { x: -(b.y - a.y) / len, y: (b.x - a.x) / len };
-			});
-			const line = (ctx: CanvasRenderingContext2D, offset: number, width: number, style: string) => {
-				ctx.strokeStyle = style;
-				ctx.lineWidth = width;
-				ctx.beginPath();
-				pts.forEach((p, i) => {
-					const x = p.x + normals[i].x * offset * size;
-					const y = p.y + normals[i].y * offset * size;
-					if (i) ctx.lineTo(x, y);
-					else ctx.moveTo(x, y);
-				});
-				ctx.stroke();
-			};
-			for (const [ctx, base, pile] of [
-				[g.scatter, g.base.scatter, `rgba(${FILM.join(",")}, 0.13)`],
-				[g.occlude, g.base.occlude, `rgba(${SHADE.join(",")}, 0.12)`],
-			] as const) {
-				ctx.save();
-				ctx.setTransform(1, 0, 0, 1, 0, 0);
-				ctx.globalCompositeOperation = "copy";
-				ctx.drawImage(base.canvas, 0, 0);
-				ctx.restore();
-				ctx.lineCap = "round";
-				ctx.lineJoin = "round";
-				ctx.globalCompositeOperation = "destination-out";
-				for (const f of hand.fingers) {
-					line(ctx, f.offset, f.width * size * 1.3, `rgba(0,0,0,${f.strength * 0.72})`);
-					for (const s of f.streaks) {
-						line(ctx, f.offset + s.offset * f.width, s.width * f.width * size, `rgba(0,0,0,${s.strength * f.strength})`);
-					}
-				}
-				ctx.globalCompositeOperation = "source-over";
-				for (const ridge of hand.ridges) line(ctx, ridge.offset, ridge.width * size, pile);
+			if (!g) return null;
+			const dx = b.x - a.x;
+			const dy = b.y - a.y;
+			const len = Math.hypot(dx, dy);
+			if (len < 0.5) return from;
+			const nx = -dy / len;
+			const ny = dx / len;
+			// Turn the hand smoothly from the last frame's heading to this one's,
+			// or its outer fingers jump on tight curves and leave gaps.
+			const n0 = from ?? { x: nx, y: ny };
+			const hand = g.hand * scale;
+			const steps = Math.max(1, Math.ceil(len / 3));
+			const { film, residue } = g;
+			// Full removal with round ends: overlaps between runs and frames
+			// clear nothing twice, so they leave no seams.
+			film.globalCompositeOperation = "destination-out";
+			film.lineCap = "round";
+			film.lineJoin = "round";
+			film.strokeStyle = "#000";
+			if (residue) {
+				residue.lineCap = "round";
+				residue.strokeStyle = `rgba(${DUST.join(",")}, 0.045)`;
 			}
-			const a = pts[pts.length - 2];
-			const b = pts[pts.length - 1];
-			const n = normals[normals.length - 1];
-			shedMotes(g, a, b, n.x, n.y, size);
-			if (performance.now() - g.measuredAt > 160) measure();
+			for (const f of fingers) {
+				if (u1 < f.t0 || u0 > f.t1) continue;
+				const fw = f.width * hand;
+				for (const s of f.bristles) {
+					const smear = residue && s.seed % 6 < 1;
+					let run = 0;
+					const flush = () => {
+						if (!run) return;
+						film.stroke();
+						if (smear) residue.stroke();
+						run = 0;
+					};
+					for (let k = 0; k <= steps; k++) {
+						const t = k / steps;
+						const u = u0 + (u1 - u0) * t;
+						// The contact patch shrinks as the finger lifts: every line draws
+						// in toward the middle and thins, so the stroke narrows smoothly.
+						const contact = pressure(f, u);
+						const edge = Math.abs(s.offset);
+						// Only the outer lines run dry, and more so under light pressure.
+						const dry = Math.max(0, edge - 0.55) / 0.45 + (1 - contact) * 0.3;
+						const on = contact > 0.04 && vnoise(s.seed + u * 14) >= dry * dry * 0.85;
+						if (!on) {
+							flush();
+							continue;
+						}
+						// Fingers are never quite parallel: each drifts a little across the sweep.
+						const off = (f.offset + 0.025 * Math.sin(u * 4 + f.wave)) * hand + s.offset * fw * 0.5 * contact;
+						const hx = n0.x + (nx - n0.x) * t;
+						const hy = n0.y + (ny - n0.y) * t;
+						const hl = Math.hypot(hx, hy) || 1;
+						// A fingertip is round: its outer lines trail its middle.
+						const lag = s.offset * s.offset * fw * 0.45;
+						const x = a.x + dx * t + (hx / hl) * off - (dx / len) * lag;
+						const y = a.y + dy * t + (hy / hl) * off - (dy / len) * lag;
+						if (!run) {
+							film.lineWidth = Math.max(0.8, s.width * fw * (0.4 + 0.6 * contact));
+							film.beginPath();
+							film.moveTo(x, y);
+							if (smear) {
+								residue.lineWidth = film.lineWidth * 0.6;
+								residue.beginPath();
+								residue.moveTo(x, y);
+							}
+						}
+						film.lineTo(x, y);
+						if (smear) residue.lineTo(x, y);
+						run++;
+					}
+					flush();
+				}
+			}
+			film.globalCompositeOperation = "source-over";
+			if (performance.now() - g.measuredAt > 110) measure();
+			return { x: nx, y: ny };
 		},
 		[measure],
 	);
@@ -510,11 +504,21 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 			setStage("clean");
 			return;
 		}
-		const arcs = SWEEPS.map((y, i) => ({ y, dir: i % 2 ? -1 : 1, hand: makeHand() }));
+		// No two sweeps alike: each arcs, tilts and reaches a little differently.
+		const arcs = SWEEPS.map((y, i) => ({
+			y,
+			dir: i % 2 ? -1 : 1,
+			hand: makeHand(),
+			bow: 0.12 + Math.random() * 0.1,
+			tilt: (Math.random() - 0.5) * 0.12,
+			from: -0.14 + Math.random() * 0.12,
+			to: 1.02 + Math.random() * 0.12,
+		}));
 		const start = performance.now();
 		const per = SWEEP_MS + LIFT_MS;
 		let arc = -1;
-		let pts: Pt[] = [];
+		let heading: Pt | null = null;
+		let last = { p: { x: 0, y: 0 }, u: 0 };
 		const frame = (t: number) => {
 			// A frame's timestamp can precede the call that scheduled it.
 			const k = Math.max(0, t - start) / per;
@@ -524,31 +528,21 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 				setStage((s) => (reached(s, "clean") ? s : "clean"));
 				return;
 			}
-			const f = ((k - i) * per) / SWEEP_MS;
-			if (f <= 1) {
-				// Ease in and out, as an arm would.
-				const along = a.dir > 0 ? smooth(f) : 1 - smooth(f);
-				const p = {
-					x: (-0.1 + 1.2 * along) * g.width,
-					y: (a.y - 0.16 * Math.sin(Math.PI * along)) * g.height,
-				};
-				if (i !== arc) {
-					// A new sweep starts from the glass as the last one left it.
-					arc = i;
-					pts = [];
-					if (g.base) {
-						for (const [base, layer] of [
-							[g.base.scatter, g.scatter],
-							[g.base.occlude, g.occlude],
-						] as const) {
-							base.globalCompositeOperation = "copy";
-							base.drawImage(layer.canvas, 0, 0);
-						}
-					}
-				}
-				pts.push(p);
-				wipe(pts, a.hand, 1.45);
+			const f = Math.min(1, ((k - i) * per) / SWEEP_MS);
+			// Ease in and out, as an arm would.
+			const u = smooth(f);
+			const along = a.dir > 0 ? u : 1 - u;
+			const p = {
+				x: (a.from + (a.to - a.from) * along) * g.width,
+				y: (a.y - a.bow * Math.sin(Math.PI * along) + a.tilt * (along - 0.5)) * g.height,
+			};
+			if (i !== arc) {
+				arc = i;
+				heading = null;
+			} else if (last.u < 1) {
+				heading = wipe(last.p, p, last.u, u, a.hand, 1.5, heading);
 			}
+			last = { p, u };
 			raf.current = requestAnimationFrame(frame);
 		};
 		raf.current = requestAnimationFrame(frame);
@@ -556,55 +550,42 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 
 	// Lay the dust before the first paint.
 	useLayoutEffect(() => {
-		const scatter = scatterEl.current;
-		const occlude = occludeEl.current;
-		if (!scatter || !occlude) return;
-		// The glass layers overhang the tube so the drift never shows an edge.
-		const { width, height } = scatter.getBoundingClientRect();
+		const film = filmEl.current;
+		if (!film) return;
+		// The glass overhangs the tube so the camera drift never shows an edge.
+		const { width, height } = film.getBoundingClientRect();
 		const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-		const sctx = sizeCanvas(scatter, width, height, dpr);
-		const octx = sizeCanvas(occlude, width, height, dpr);
-		if (!sctx || !octx) return;
-		paintDust(sctx, octx, width, height);
+		const fctx = sizeCanvas(film, width, height, dpr);
+		if (!fctx) return;
+		paintFilm(fctx, width, height, dpr);
 		const probe = document.createElement("canvas");
 		probe.width = PROBE_W;
 		probe.height = PROBE_H;
 		const mask = document.createElement("canvas");
-		mask.width = MASK_W;
-		mask.height = MASK_H;
-		const copy = (ctx: CanvasRenderingContext2D) => {
-			const c = document.createElement("canvas");
-			c.width = ctx.canvas.width;
-			c.height = ctx.canvas.height;
-			return c.getContext("2d");
-		};
-		const baseScatter = copy(sctx);
-		const baseOcclude = copy(octx);
+		mask.width = Math.round(Math.sqrt((MASK_AREA * width) / height));
+		mask.height = Math.round(MASK_AREA / mask.width);
 		const g: Glass = {
-			scatter: sctx,
-			occlude: octx,
-			base: baseScatter && baseOcclude ? { scatter: baseScatter, occlude: baseOcclude } : null,
+			film: fctx,
+			residue: residueEl.current ? sizeCanvas(residueEl.current, width, height, dpr) : null,
 			probe: probe.getContext("2d", { willReadFrequently: true }),
 			mask: mask.getContext("2d"),
-			veil: veilEl.current,
-			motes: motesEl.current ? sizeCanvas(motesEl.current, width, height, 1) : null,
-			sprite: bokehSprite(),
+			sharp: sharpEl.current,
+			haze: hazeEl.current,
+			done: false,
 			width,
 			height,
 			hand: Math.min(240, Math.max(84, Math.min(width, height) * 0.22)),
 			initial: 0,
 			measuredAt: 0,
-			live: [],
-			moteRaf: 0,
-			moteAt: 0,
-			calm: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+			maskBusy: false,
+			maskUrls: [],
 		};
 		g.initial = dustLeft(g);
 		updateHaze(g);
 		glass.current = g;
 		return () => {
 			cancelAnimationFrame(raf.current);
-			cancelAnimationFrame(g.moteRaf);
+			for (const u of g.maskUrls) URL.revokeObjectURL(u);
 		};
 	}, []);
 
@@ -626,6 +607,16 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 		const id = window.setTimeout(sweep, DORMANT_MS);
 		return () => window.clearTimeout(id);
 	}, [sweep]);
+
+	// Once the glass is clean the sharp screen shows everywhere; the blurred
+	// copy fades out over it.
+	useEffect(() => {
+		const g = glass.current;
+		if (!reached(stage, "clean") || !g || g.done) return;
+		g.done = true;
+		g.sharp?.style.setProperty("mask-image", "none");
+		g.sharp?.style.setProperty("-webkit-mask-image", "none");
+	}, [stage]);
 
 	// The sequence after the glass is wiped.
 	useEffect(() => {
@@ -688,20 +679,11 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 
 	const lit = reached(stage, "lit");
 	const off = reached(stage, "maximize");
+	const onGlass = stage !== "typing" && !reached(stage, "answered");
 	const clear = reached(stage, "clean") ? "intro-dust-clear" : "";
-
-	return (
-		<div
-			ref={root}
-			aria-hidden
-			className={`crt-screen intro ${stage === "fade" ? "intro-out" : ""}`}
-			onTransitionEnd={(e) => {
-				if (e.target === e.currentTarget && e.propertyName === "opacity") setGone(true);
-			}}
-		>
-			<div className="intro-tube font-crt" style={curved ? { filter: "url(#crt-curve)" } : undefined}>
-				<p className={`intro-clock crt-text ${lit ? "intro-clock-out" : ""}`}>{clockStamp(now)}</p>
-				{lit && (
+	const curve = curved ? { filter: "url(#crt-curve)" } : undefined;
+	const hazeStyle = { filter: `${curved ? "url(#crt-curve) " : ""}blur(10px) brightness(0.7) saturate(0.5)` };
+	const windows = lit && (
 					<>
 						<IntroWindow
 							title="top — nimbus@grid"
@@ -747,18 +729,39 @@ export function DustIntro({ onReveal }: { onReveal: () => void }) {
 							)}
 						</IntroWindow>
 					</>
-				)}
+				);
+
+	return (
+		<div
+			ref={root}
+			aria-hidden
+			className={`crt-screen intro ${stage === "fade" ? "intro-out" : ""}`}
+			onTransitionEnd={(e) => {
+				if (e.target === e.currentTarget && e.propertyName === "opacity") setGone(true);
+			}}
+		>
+			<div ref={sharpEl} className="intro-tube intro-tube-masked font-crt" style={curve}>
+				{windows}
+			</div>
+			{/*
+			 * Under dust the screen's light scatters: the same windows, blurred and
+			 * dimmed, masked to where dust is left. Clean glass shows them sharp.
+			 */}
+			{onGlass && (
+				<div ref={hazeEl} className={`intro-tube intro-tube-masked intro-tube-haze font-crt ${clear}`} style={hazeStyle}>
+					{windows}
+				</div>
+			)}
+
+
+			{/* The clock stays legible through the dust: it sits above the glow. */}
+			<div className="intro-tube intro-tube-front font-crt" style={curve}>
+				<p className={`intro-clock crt-text ${lit ? "intro-clock-out" : ""}`}>{clockStamp(now)}</p>
 			</div>
 
-			{stage !== "typing" && !reached(stage, "answered") && (
-				<>
-					<div ref={veilEl} className={`intro-glass intro-veil ${clear}`} />
-					<canvas ref={occludeEl} className={`intro-glass intro-occlude ${clear}`} />
-					<canvas ref={scatterEl} className={`intro-glass intro-scatter ${clear}`} />
-					<canvas ref={motesEl} className={`intro-glass intro-motes ${clear}`} />
-					<div className={`intro-sheen ${clear}`} />
-				</>
-			)}
+			{onGlass && <canvas ref={filmEl} className={`intro-glass intro-film ${clear}`} />}
+			<canvas ref={residueEl} className={`intro-glass intro-residue ${off ? "intro-dust-clear" : ""}`} />
+			{onGlass && <div className={`intro-sheen ${clear}`} />}
 
 			{lit && !burstDone && (
 				<div

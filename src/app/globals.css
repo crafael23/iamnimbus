@@ -521,10 +521,10 @@
 
 /*
  * The glass: flat, over the curved image, and a little larger than the tube
- * so the camera drift never shows an edge. Bottom to top: the haze the dust
- * casts on the picture, the light it blocks, the light it catches, the motes
- * in the air, and the room reflected in the glass. Each is its own blend
- * layer against the tube, so none of them may sit in a shared wrapper.
+ * so the camera drift never shows an edge. Bottom to top: the dust film,
+ * the smears a hand leaves, and the room in the glass. (The glow scattered
+ * through the dust is a blurred copy of the screen, under the glass.)
+ * Each blends against the tube on its own, so none may share a wrapper.
  */
 .intro-glass {
 	position: absolute;
@@ -534,17 +534,27 @@
 	pointer-events: none;
 	transition: opacity 1.2s ease-in;
 }
-.intro-veil {
-	backdrop-filter: blur(2.2px) saturate(0.8);
-	-webkit-backdrop-filter: blur(2.2px) saturate(0.8);
-	mask-size: 100% 100%;
-	-webkit-mask-size: 100% 100%;
+/* The screen's masks are drawn for the glass, which overhangs the tube by 12px. */
+.intro-tube-masked {
+	mask-size: calc(100% + 24px) calc(100% + 24px);
+	mask-position: -12px -12px;
+	mask-repeat: no-repeat;
 }
-.intro-occlude {
-	mix-blend-mode: multiply;
+.intro-tube-haze {
+	pointer-events: none;
+	transition: opacity 1.2s ease-in;
 }
-.intro-scatter {
+.intro-tube-front {
+	pointer-events: none;
+}
+/* Dust edges are never razor sharp; the slight blur also smooths the strokes. */
+.intro-film {
 	mix-blend-mode: screen;
+	filter: blur(0.6px);
+}
+.intro-residue {
+	mix-blend-mode: screen;
+	transition: opacity 0.6s ease-out;
 }
 .intro-sheen {
 	position: absolute;
@@ -585,7 +595,7 @@
 }
 @keyframes intro-drift-far {
 	from {
-		transform: translate(-3px, 1.5px);
+		transform: translate(-2px, 1px);
 	}
 	to {
 		transform: none;
@@ -593,7 +603,7 @@
 }
 @keyframes intro-drift-near {
 	from {
-		transform: translate(-9px, 4px);
+		transform: translate(-6px, 2.5px);
 	}
 	to {
 		transform: none;
