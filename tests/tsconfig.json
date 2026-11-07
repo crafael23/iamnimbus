@@ -10,5 +10,5 @@
 		"isolatedModules": true,
 		"types": ["node"]
 	},
-	"include": ["./**/*.ts", "../vitest.config.ts"]
+	"include": ["./**/*.ts", "../vitest.config.mts"]
 }
